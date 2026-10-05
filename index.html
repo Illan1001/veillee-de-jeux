@@ -191,6 +191,7 @@ button.seatb{cursor:pointer}
 .emblem.big{width:84px;height:84px}
 .emblem.big svg{width:54px;height:54px}
 .emblem.wolf{color:var(--wolf);background:color-mix(in srgb,var(--wolf) 14%,transparent)}
+.emblem.navy{color:#5b8fd9;background:color-mix(in srgb,#5b8fd9 16%,transparent)}
 .emblem.mask{color:var(--accent);background:color-mix(in srgb,var(--accent) 14%,transparent)}
 .gt{display:flex;flex-direction:column;gap:5px;min-width:0}
 .gt b{font-family:var(--display);font-weight:400;font-size:28px;line-height:1.05}
@@ -2935,6 +2936,7 @@ const ICONS={
   key:'<circle cx="15" cy="24" r="8"/><path d="M23 24h20M37 24v7M43 24v5"/>',
   medal:'<path d="M16 4l8 12 8-12"/><circle cx="24" cy="30" r="12"/><path d="M24 23l2 4 4.5.6-3.2 3 .8 4.4-4.1-2.2-4.1 2.2.8-4.4-3.2-3 4.5-.6z"/>',
   mask:'<path d="M5 15c6-4 12-5 19-5s13 1 19 5c0 11-6 18-12 18-3 0-5-3-7-3s-4 3-7 3C11 33 5 26 5 15z"/><path d="M13 20c2-2 6-2 8 0M27 20c2-2 6-2 8 0"/><path d="M18 40c4 2 8 2 12 0"/>',
+  anchor:'<circle cx="24" cy="9" r="4"/><path d="M24 13v29M15 20h18M8 27c0 9 7 15 16 15s16-6 16-15M8 27l-3 4M8 27l4 2M40 27l3 4M40 27l-4 2"/>',
   blank:'<rect x="10" y="5" width="28" height="38" rx="4"/><path d="M19 18a5 5 0 1 1 7 4.6c-1.4.7-2 1.6-2 3.4M24 32h.01"/>',
   menu:'<path d="M10 16h28M10 24h28M10 32h28"/>'
 };
@@ -6531,9 +6533,29 @@ const liliSVG=uid=>{
     <path d="M52 79q8 6 16 0" fill="none" stroke="#8a4b3a" stroke-width="2.6" stroke-linecap="round"/>
   </g></g></svg>`;
 };
+// Portrait dessiné de Juju (d'après sa photo) : cheveux courts bruns un peu ébouriffés, golfes dégagés, sourcils épais, barbe de deux semaines
+const jujuSVG=uid=>{
+  const tufts=[[44,30,4],[50,26,4.5],[57,24,4.5],[64,24,4.5],[71,26,4.5],[77,30,4],[47,27,3],[67,22,3],[40,35,3.5],[81,36,3.5]].map(([x,y,r])=>`<circle cx="${x}" cy="${y}" r="${r}"/>`).join('');
+  return `<svg class="lili" viewBox="0 0 120 120" aria-hidden="true"><defs><clipPath id="jujuClip${uid}"><circle cx="60" cy="60" r="58"/></clipPath></defs>
+  <circle cx="60" cy="60" r="58" fill="#8cc6a6"/>
+  <g clip-path="url(#jujuClip${uid})"><g transform="translate(60 64) scale(1.12) translate(-60 -60)">
+    <path d="M18 122c2-20 18-30 42-30s40 10 42 30z" fill="#3f4f63"/>
+    <path d="M50 90h20v12c-4 4-16 4-20 0z" fill="#dca684"/>
+    <ellipse cx="35" cy="63" rx="5" ry="8" fill="#dca684"/><ellipse cx="85" cy="63" rx="5" ry="8" fill="#dca684"/>
+    <path d="M37 52c0-16 10-25 23-25s23 9 23 25v15c0 18-10 31-23 31S37 85 37 67z" fill="#ebbd9c"/>
+    <path d="M37.5 66c0 3 .3 5 .8 7 2 14 10 25 21.7 25s19.7-11 21.7-25c.5-2 .8-4 .8-7-1.5 5-3.5 7-6 8-3-5-8.5-7.5-16.5-7.5s-13.5 2.5-16.5 7.5c-2.5-1-4.5-3-6-8z" fill="#2f2119" opacity=".88"/>
+    <path d="M48 76q12-6 24 0q-3 1.6-12 1.6t-12-1.6z" fill="#2f2119"/>
+    <path d="M53 80.5q7-1.6 14 0q-1.5 3.5-7 3.5t-7-3.5z" fill="#d58f88"/>
+    <g fill="#2b211b"><path d="M37 54C36 41 41 31 50 28C55 23 66 23 71 27C80 30 85 39 83 54L80.5 54C80.5 47 79 43 76 41C73 41.5 71 40 70 38C64 36 57 36 51 38C50 40 48 41.5 45 41C42 43 40 47 39.5 54Z"/>${tufts}</g>
+    <path d="M42.5 53q6.5-3.2 12.5-1M65 52q6-2.2 12.5 1" stroke="#22180f" stroke-width="3.4" fill="none" stroke-linecap="round"/>
+    <path d="M44.5 60.5q4.5-2.4 9 0M66.5 60.5q4.5-2.4 9 0" stroke="#8a5a40" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+    <ellipse cx="49" cy="62.4" rx="2.5" ry="1.6" fill="#2a1a12"/><ellipse cx="71" cy="62.4" rx="2.5" ry="1.6" fill="#2a1a12"/>
+    <path d="M61 57q.5 7 2.5 10.5q-1.5 2.5-4 1.5" fill="none" stroke="#c48c6b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+  </g></g></svg>`;
+};
 // Qui a proposé chaque jeu : un portrait dessiné et un prénom (d'autres copains viendront avec leurs jeux)
-const AUTHORS={lili:{name:'Lili',face:liliSVG}};
-const GAME_BY={lg:'lili',uc:'lili',sp:'lili',mi:'lili'};
+const AUTHORS={lili:{name:'Lili',face:liliSVG},juju:{name:'Juju',face:jujuSVG}};
+const GAME_BY={lg:'lili',uc:'lili',sp:'lili',mi:'lili',bn:'juju'};
 const authorHTML=g=>{const a=AUTHORS[GAME_BY[g]];return a?`<span class="author">${a.face(g)}<span>Jeu proposé par <b>${esc(a.name)}</b></span></span>`:'';};
 function goLG(){
   renderSetup();
@@ -6560,12 +6582,13 @@ function renderHome(){
       <button class="gametile" type="button" data-act="uc"><span class="emblem mask">${icon('mask',2.2)}</span><span class="gt"><b>Undercover</b><span>Un mot commun, des undercovers et un Mr White. Démasquez-les sans trahir votre mot.</span><span class="meta2">3 à 20 joueurs</span>${authorHTML('uc')}</span></button>
       <button class="gametile" type="button" data-act="sp"><span class="emblem mask">${icon('eye',2.2)}</span><span class="gt"><b>L'Espion</b><span>Tout le monde connaît le lieu secret, sauf l'espion. Questionnez-vous pour le démasquer… sans trop en dire.</span><span class="meta2">3 à 12 joueurs · 10 min</span>${authorHTML('sp')}</span></button>
       <button class="gametile" type="button" data-act="mi"><span class="emblem wolf">${icon('shield',2.2)}</span><span class="gt"><b>Les Missions</b><span>Des traîtres sabotent en secret les missions de la résistance. Personne n'est éliminé : tout le monde joue jusqu'au bout.</span><span class="meta2">5 à 10 joueurs · 30 min</span>${authorHTML('mi')}</span></button>
+      <button class="gametile" type="button" data-act="bn"><span class="emblem navy">${icon('anchor',2.2)}</span><span class="gt"><b>Touché-coulé</b><span>La bataille navale à deux, chacun sur son téléphone : place ta flotte, tire, et déclenche le pouvoir de ton capitaine.</span><span class="meta2">2 joueurs · 15 min</span>${authorHTML('bn')}</span></button>
     </div>
     ${NET.room&&subtle?`<button class="btn ghost" type="button" data-act="asplayer">Je suis joueur · rejoindre une partie</button>`:''}
     ${scoreboardHTML()}`);
   $('#main').onclick=e=>{
     const a=e.target.closest('[data-act]')?.dataset.act;
-    if(a==='lg')goLG();else if(a==='uc')goUC();else if(a==='sp'||a==='mi')xGo(a);else if(a==='asplayer')clientMode();
+    if(a==='lg')goLG();else if(a==='uc')goUC();else if(a==='sp'||a==='mi')xGo(a);else if(a==='bn'){if(NET.on)netStop();location.href='bataille-navale.html';}else if(a==='asplayer')clientMode();
     else if(a==='resumex')resumeX();else if(a==='dropx'){clearXSave();renderHome();}
     else if(a==='resumelg')resumeLG();else if(a==='resumeuc')resumeUC();
     else if(a==='droplg'){clearLGSave();renderHome();}else if(a==='dropuc'){clearUCSave();renderHome();}
