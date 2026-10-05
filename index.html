@@ -290,6 +290,30 @@ html.big .btn{font-size:20px;min-height:62px}
 .author .lili{width:42px;height:42px;flex:none;border-radius:50%;box-shadow:0 0 0 2px var(--surface),0 0 0 3.5px var(--accent)}
 .gt .author span{color:var(--fg);font-size:15px}
 .gt .author b{font:700 15px/1.2 var(--body);color:var(--accent)}
+/* L'Espion et Les Missions */
+.loclist{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}
+.locitem{border:1.5px solid var(--line);background:var(--surface);border-radius:10px;padding:8px 10px;font:600 14px/1.2 var(--body);text-align:left;cursor:pointer}
+.locitem.off{opacity:.38;text-decoration:line-through}
+.mboard{display:grid;grid-template-columns:repeat(5,1fr);gap:8px}
+.mslot{aspect-ratio:1;border-radius:50%;border:2px solid var(--line);display:flex;flex-direction:column;align-items:center;justify-content:center;background:var(--surface);text-align:center;padding:4px}
+.mslot b{font:800 22px/1 var(--body)}
+.mslot small{font-size:10px;line-height:1.1;color:var(--muted)}
+.mslot.cur{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent)}
+.mslot.ok{background:color-mix(in srgb,var(--village) 22%,var(--surface));border-color:var(--village)}
+.mslot.ko{background:color-mix(in srgb,var(--wolf) 22%,var(--surface));border-color:var(--wolf)}
+.mrej{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.mrej i{display:inline-block;width:14px;height:14px;border-radius:50%;border:1.5px solid var(--line);margin-left:5px}
+.mrej i.on{background:var(--wolf);border-color:var(--wolf)}
+.mhist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px;font-size:14px}
+.mhist li{border-bottom:1px dashed var(--line);padding-bottom:6px}
+.mhist .ok{color:var(--village);font-weight:700}.mhist .ko{color:var(--wolf);font-weight:700}
+.mhist small{color:var(--muted)}
+.mcards{display:flex;flex-wrap:wrap;gap:10px;justify-content:center}
+.mcards .flip{width:92px;margin:0}
+.mcard{padding:12px 8px;gap:6px;min-height:118px;justify-content:center}
+.mcard .glyph{width:44px;height:44px}
+.mcard b{font-size:14px}
+.mcard.back .card-name{font-size:40px}
 /* Carte retournée et dépouillement */
 .flip{perspective:900px;width:min(100%,300px);margin:6px auto 0}
 .flip-inner{display:grid;transition:transform .9s cubic-bezier(.3,1.35,.5,1);transform-style:preserve-3d}
@@ -3139,6 +3163,7 @@ function renderTask(t,names,done){
   if(t.pills&&t.pills.length)body+=`<div class="namelist">${t.pills.map(x=>`<span class="pill ${t.pillTone==='solo'?'solo':''}">${esc(x)}</span>`).join('')}</div>`;
   if(t.result)body+=`<p class="result ${t.result.yes?'yes':'no'}">${esc(t.result.text)}</p>`;
   if(t.card&&ROLES[t.card])body+=card(t.card,!!t.tip);
+  if(t.xcard)body+=xCardHTML(t.xcard);
   if(t.secret!=null)body+=secretBox(t.secret);
   body+=[].concat(t.note||[]).filter(Boolean).map(x=>`<p class="note">${esc(x)}</p>`).join('');
   let actions='';
@@ -3294,8 +3319,8 @@ const NET={room:null,canEdit:false,on:false,gr:null,code:null,keys:null,pk:null,
 const netReady=()=>!!(NET.room&&subtle&&NET.canEdit);
 
 // La salle est ouverte pour un jeu à la fois : 'lg' (Loups-garous) ou 'uc' (Undercover)
-const inGame=()=>NET.kind==='uc'?!!UC:!!G;
-const seatCount=()=>NET.kind==='uc'?(UC?UC.players.length:UCS.count):(G?G.players.length:setup.count);
+const inGame=()=>NET.kind==='uc'?!!UC:isX(NET.kind)?!!(XG&&XG.kind===NET.kind):!!G;
+const seatCount=()=>NET.kind==='uc'?(UC?UC.players.length:UCS.count):isX(NET.kind)?(XG&&XG.kind===NET.kind?XG.players.length:XS[NET.kind].count):(G?G.players.length:setup.count);
 async function netStart(kind='lg'){
   if(NET.on&&NET.kind===kind)return;
   if(NET.on)await netStop();
@@ -3329,6 +3354,7 @@ async function netStart(kind='lg'){
   NET.starting=false;
   if(APP==='lg'&&!G)renderSetup();
   if(APP==='uc'&&!UC)ucRenderSetup();
+  if(isX(APP)&&!XG)xRenderSetup(APP);
 }
 async function netStop(){
   if(!NET.on)return;
@@ -3358,7 +3384,7 @@ function netPeers(){
     for(const [s,peer] of Object.entries(NET.owners)){const pr=peers.find(x=>x.peer===peer);const t=pr&&pr.presence&&pr.presence.sus;if(Number.isInteger(t)&&G.players[t]&&+s!==t)sus[s]=t;}
     G.sus=sus;if(G.phase==='day')renderSus();
   }
-  renderSeats();
+  renderSeats();xRenderSeats();
 }
 function claim(p,seat){
   const cur=NET.owners[seat];
@@ -3384,6 +3410,7 @@ function processAct(seat){
   NET.lastAct[seat]=a.iv;
   unseal(k,a).then(m=>{
     // Demande secrète du juge bègue, envoyée depuis son téléphone pendant la journée
+    if(m.id==='spy'){xSpecial(seat,'spy');return;}
     if(m.id==='judge'){if(NET.kind==='lg'&&G&&G.players[seat]&&G.players[seat].role==='juge'&&G.players[seat].alive&&!G.judgeUsed){G.judgeAsk=true;syncInfo();}return;}
     const w=NET.waiters[m.id];if(w&&w.seat===seat)w.res(m.v);
   }).catch(()=>{});
@@ -3391,6 +3418,7 @@ function processAct(seat){
 function netPub(){
   if(!NET.on)return;
   if(NET.kind==='uc')return ucPub();
+  if(isX(NET.kind))return xPub();
   const data={game:'lg',theme:THEME,renames:THEME_REN,disc:G?!!G.disc:!!setup.settings.disc,code:NET.code,pk:NET.pk,names:G?G.players.map(p=>p.name):effectiveNames(),owners:NET.owners,modes:G?G.players.map(p=>G.central.has(p.id)?'central':'phone'):effectiveNames().map((_,i)=>seatMode(i)),
     gid:G?G.gid:null,phase:G?G.phase:'lobby',night:G?G.night:0,alive:G?G.players.map(p=>p.alive?1:0):[],log:NET.log.slice(-8),
     final:G&&G.phase==='end'?G.players.map(p=>p.role+(p.infected||p.turnedWolf?'*':'')):null};
@@ -3850,12 +3878,12 @@ function flipHTML(role){
 }
 const flipNow=()=>{const f=$('#flip');if(f)f.classList.add('on');};
 // Dépouillement d'un vote secret : les bulletins sortent un par un, dans le désordre
-async function tallyReveal(eyebrow,ballots,cands,abst){
+async function tallyReveal(eyebrow,ballots,cands,abst,nameOf=i=>P(i).name){
   const ids=[...new Set(ballots.map(b=>b.t))].sort((a,b)=>a-b);
   const total=ballots.reduce((s,b)=>s+b.w,0)||1;
   let skip=false;
   view(`<p class="eyebrow">${esc(eyebrow)} · dépouillement</p><h2 class="h" id="tallyH">Dépouillement…</h2>
-    <div class="tally">${ids.map(i=>`<div class="trow" data-t="${i}"><span class="nm">${esc(P(i).name)}</span><span class="tbar"><i></i></span><b>0</b></div>`).join('')}</div>
+    <div class="tally">${ids.map(i=>`<div class="trow" data-t="${i}"><span class="nm">${esc(nameOf(i))}</span><span class="tbar"><i></i></span><b>0</b></div>`).join('')}</div>
     <p class="note" id="tallyN">${ballots.length?`0 bulletin sur ${ballots.length}`:'Aucun bulletin.'}${abst?` · ${abst} abstention${abst>1?'s':''}`:''}</p>`,
     `<button class="btn ghost small" type="button" id="tallySkip" style="align-self:center">Passer l'animation</button>`);
   $('#tallySkip').onclick=()=>{skip=true;};
@@ -5044,10 +5072,12 @@ function clientMode(){
 }
 async function clientJoin(raw){
   raw=String(raw||'').toLowerCase();
-  let kind=raw.startsWith('uc-')?'uc':raw.startsWith('lg-')?'lg':null;
-  const code=raw.replace(/^(uc|lg)-/,'').replace(/[^a-z0-9]/g,'').slice(0,8);
+  const KINDS=['lg','uc','sp','mi'];
+  const pre=raw.match(/^(lg|uc|sp|mi)-/);
+  let kind=pre?pre[1]:null;
+  const code=raw.replace(/^(uc|lg|sp|mi)-/,'').replace(/[^a-z0-9]/g,'').slice(0,8);
   if(!code)return;
-  if(!kind){const h=(NET.room?NET.room.peers():[]).find(p=>p.presence&&p.presence.host===code);kind=h&&h.presence.game==='uc'?'uc':'lg';}
+  if(!kind){const h=(NET.room?NET.room.peers():[]).find(p=>p.presence&&p.presence.host===code);kind=h&&KINDS.includes(h.presence.game)?h.presence.game:'lg';}
   window.__p2pRole='client';
   try{
     if(!CL.keys){CL.keys=await genKeys();CL.pk=await exportPk(CL.keys);}
@@ -5056,11 +5086,13 @@ async function clientJoin(raw){
     if(window.STANDALONE){try{history.replaceState(null,'','#'+kind+'-'+code);}catch(e){}}
   }catch(e){
     // En version autonome, un simple code ne dit pas de quel jeu il s'agit : on essaie l'autre
-    if(window.STANDALONE&&!raw.startsWith('uc-')&&!raw.startsWith('lg-')&&kind==='lg'){return clientJoin('uc-'+code);}
+    // En version autonome, un simple code ne dit pas de quel jeu il s'agit : on essaie les autres jeux tour à tour
+    if(window.STANDALONE&&(!pre||CL.tryKinds)){const i=KINDS.indexOf(kind);if(i<KINDS.length-1){CL.tryKinds=true;return clientJoin(KINDS[i+1]+'-'+code);}}
+    CL.tryKinds=false;
     CL.err=e==='absent'||e==='timeout'?"Aucune partie ouverte avec ce code. Vérifie qu'il est bien affiché sur le téléphone central.":"Impossible de rejoindre cette partie. Vérifie le code.";
     renderClient();return;
   }
-  CL.err=null;
+  CL.err=null;CL.tryKinds=false;
   CL.gr.on('pub',m=>{if(!m||!m.data||typeof m.data!=='object')return;CL.pub=m.data;ensureKey();renderClient();});
   CL.gr.on('sx',async m=>{
     const d=m&&m.data;if(!d||d.s!==CL.seat||!CL.key)return;
@@ -5097,12 +5129,12 @@ function clientShow(key,body,actions,wire){
 function renderClient(){
   if(!CL.on)return;
   const pub=CL.pub,me=myPeer(),names=pub&&Array.isArray(pub.names)?pub.names:[];
-  const phase=pub?pub.phase:'lobby',isUC=!!(pub&&pub.game==='uc');
+  const phase=pub?pub.phase:'lobby',isUC=!!(pub&&(pub.game==='uc'||isX(pub.game))),isXg=!!(pub&&isX(pub.game));
   if(applyTheme(pub&&!isUC?pub.theme:null,pub&&!isUC?pub.renames:null))CL.shown=null;
   const disc=!!(pub&&!isUC&&pub.disc);if(disc!==DISC){DISC=disc;CL.shown=null;}
   document.documentElement.dataset.phase=!isUC&&(phase==='day'||phase==='end')?'day':'night';
   const b=$('#bar');b.hidden=false;
-  const label=isUC?(pub.round?`Tour ${+pub.round}`:'Undercover'):!pub||phase==='lobby'||phase==='deal'?'Ton téléphone':phase==='end'?'Fin de partie':`${phase==='night'?'Nuit':'Jour'} ${+pub.night||1}`;
+  const label=isXg?(pub.game==='sp'?"L'Espion":'Les Missions'):isUC?(pub.round?`Tour ${+pub.round}`:'Undercover'):!pub||phase==='lobby'||phase==='deal'?'Ton téléphone':phase==='end'?'Fin de partie':`${phase==='night'?'Nuit':'Jour'} ${+pub.night||1}`;
   const conn=CL.gr?CL.gr.connected():false;
   const barHtml=`<span class="phase">${esc(label)}</span><span class="meta">· ${CL.gr?(conn?'connecté':'reconnexion…'):'hors ligne'}</span><span class="spacer"></span>${NET.canEdit&&!G&&!UC?`<button class="btn small ghost" type="button" id="leaveClient">Retour</button>`:''}`;
   if(b.dataset.h!==barHtml){b.dataset.h=barHtml;b.innerHTML=barHtml;const l=$('#leaveClient');if(l)l.onclick=()=>{CL.on=false;CL.shown='';if(CL.gr){CL.gr.leave().catch(()=>{});CL.gr=null;CL.pub=null;CL.seat=null;}b.dataset.h='';renderHome();};}
@@ -5110,12 +5142,12 @@ function renderClient(){
   // 1. Choisir la partie
   if(!CL.gr){
     const found=(NET.room?NET.room.peers():[]).filter(p=>p.presence&&typeof p.presence.host==='string'&&/^[a-z0-9]{1,8}$/.test(p.presence.host));
-    const gm={};found.forEach(p=>{gm[p.presence.host]=p.presence.game==='uc'?'uc':'lg';});
+    const gm={};found.forEach(p=>{gm[p.presence.host]=['uc','sp','mi'].includes(p.presence.game)?p.presence.game:'lg';});
     const uniq=Object.keys(gm);
     clientShow('join:'+JSON.stringify(gm)+(CL.err||''),
       `<p class="eyebrow">Rejoindre une partie</p><h2 class="h">${window.STANDALONE?'Entre le code de la partie.':uniq.length?'Une partie t\'attend.':'Aucune partie ouverte pour l\'instant.'}</h2>
        <p class="note">${window.STANDALONE?'Scanne le QR code affiché sur le téléphone central, ou tape son code ci-dessous.':uniq.length?'Touche le code annoncé par le téléphone central.':'L\'organisateur doit activer « Téléphones des joueurs » sur le téléphone central. Tu peux aussi taper le code affiché.'}</p>
-       ${uniq.map(c=>`<button class="btn" type="button" data-join="${esc(gm[c]+'-'+c)}">${gm[c]==='uc'?'Undercover':'Loups-garous'} · partie ${esc(c.toUpperCase())}</button>`).join('')}
+       ${uniq.map(c=>`<button class="btn" type="button" data-join="${esc(gm[c]+'-'+c)}">${({uc:'Undercover',sp:"L'Espion",mi:'Les Missions'})[gm[c]]||'Loups-garous'} · partie ${esc(c.toUpperCase())}</button>`).join('')}
        <form class="addrow" id="codeForm" autocomplete="off"><input class="input" id="codeIn" placeholder="Code (ex. K7PM)" maxlength="8" autocapitalize="characters"><button class="btn small" type="submit">Rejoindre</button></form>
        ${CL.err?`<p class="warn">${esc(CL.err)}</p>`:''}`,'',
       ()=>{$('#main').onclick=e=>{const j=e.target.closest('[data-join]');if(j)clientJoin(j.dataset.join);};$('#codeForm').onsubmit=e=>{e.preventDefault();clientJoin($('#codeIn').value);};});
@@ -5164,6 +5196,7 @@ function renderClient(){
     clientShow(key,`<div class="where-big"><span class="emblem mask">${icon('house',2.2)}</span><p class="eyebrow">Où jouer</p><h2 class="h">${esc(st.hint.title||'Regarde le téléphone central')}</h2><p class="note">${esc(st.hint.text||'')}</p></div>`,'');
     return;
   }
+  if(isXg){xClientIdle(pub,st,myName,names);return;}
   if(isUC){ucClientIdle(pub,st,myName,names);return;}
   if(phase!=='day'&&CL.sus!=null){CL.sus=null;CL.gr.presence({sus:null}).catch(()=>{});}
   // 4. Écran de repos : mon rôle, mes infos, la vie du village
@@ -5690,6 +5723,736 @@ function ucClientIdle(pub,st,myName,names){
   clientShow('ucidle:'+body+actions,body,actions,()=>{$('#main').onclick=e=>{if(e.target.closest('[data-act=card]')){CL.showCard=!CL.showCard;renderClient();}};});
 }
 
+
+/* ================= Jeux supplémentaires : L'Espion et Les Missions =================
+   Même fonctionnement que l'Undercover : un téléphone central qui mène la partie, et en option un téléphone par joueur
+   (cartes et choix secrets chiffrés pour chaque joueur). Pas de voix : les annonces se lisent à l'écran. */
+const XDEF={
+  sp:{title:"L'Espion",min:3,max:12,def:6,key:'sp-setup',icon:'eye',cls:'mask'},
+  mi:{title:'Les Missions',min:5,max:10,def:7,key:'mi-setup',icon:'shield',cls:'wolf'}
+};
+const XS={};
+for(const k of Object.keys(XDEF)){
+  const s=store.get(XDEF[k].key,{}),d=XDEF[k];
+  XS[k]={count:Math.min(d.max,Math.max(d.min,s.count||d.def)),names:Array.isArray(s.names)?s.names:[],modes:Array.isArray(s.modes)?s.modes:[],
+    mode:s.mode==='phones'?'phones':'single',opt:Object.assign(k==='sp'?{minutes:8}:{merlin:true,perceval:false,mordred:false,oberon:false},s.opt||{})};
+}
+const xPersist=k=>store.set(XDEF[k].key,XS[k]);
+let XG=null,xSeatSel=null;
+const isX=k=>k==='sp'||k==='mi';
+function xNames(k){
+  const S=XS[k],out=[],seen={};
+  for(let i=0;i<S.count;i++){
+    let n=(S.names[i]||'').trim().replace(/\s+/g,' ')||`Joueur ${i+1}`;
+    const key=n.toLowerCase();if(seen[key]){seen[key]++;n=`${n} ${seen[key]}`;}else seen[key]=1;
+    out.push(n);
+  }
+  return out;
+}
+const xSeatMode=(k,i)=>XS[k].modes[i]==='central'?'central':'phone';
+const xRemoteOK=p=>!!(NET.on&&XG&&NET.kind===XG.kind&&!XG.central.has(p.id)&&NET.seatKeys[p.id]&&peerOf(p.id));
+const XP=id=>XG.players[id];
+const xTask=t=>track(res=>renderTask(t,XG.players.map(p=>p.name),res));
+async function xAct(p,task){
+  if(!xRemoteOK(p))return xTask(task);
+  const rp=remoteTask(p.id,task);
+  view(`<div class="sleep"><p>${esc(p.name)} répond sur son téléphone…</p></div>`,fallbackLink);
+  const r=await Promise.race([rp,ask().then(()=>FALLBACK)]);
+  if(r===FALLBACK){cancelTasks(p.id);return xTask(task);}
+  return r;
+}
+function xLog(t){if(XG){XG.log=(XG.log||[]).concat(t).slice(-12);}if(NET.on&&XG&&NET.kind===XG.kind){NET.log.push(t);xPub();}}
+const xSetR=(p,patch)=>{if(NET.on&&NET.R[p.id])setR(p.id,patch);};
+
+/* ---------- Réseau ---------- */
+function xPub(){
+  if(!NET.on||!isX(NET.kind))return;
+  const k=NET.kind,names=XG&&XG.kind===k?XG.players.map(p=>p.name):xNames(k);
+  const g=XG&&XG.kind===k?XG:null;
+  const data={game:k,code:NET.code,pk:NET.pk,names,owners:NET.owners,
+    modes:g?g.players.map(p=>g.central.has(p.id)?'central':'phone'):names.map((_,i)=>xSeatMode(k,i)),
+    gid:g?g.gid:null,phase:g?g.phase:'lobby',round:g?g.round:0,log:NET.log.slice(-8)};
+  if(g&&k==='sp')Object.assign(data,{left:g.left,first:g.first,final:g.phase==='end'?{spy:g.spy,loc:g.loc}:null});
+  if(g&&k==='mi')Object.assign(data,{board:miBoardData(),final:g.phase==='end'?g.players.map(p=>p.role):null});
+  NET.gr.emit('pub',data).catch(()=>{});
+}
+function xNetInit(){
+  if(!isX(NET.kind))return;
+  NET.R={};NET.waiters={};NET.log=[];
+  if(XG&&XG.kind===NET.kind)for(const p of XG.players)if(!XG.central.has(p.id))NET.R[p.id]={gid:XG.gid,ver:++NET.ver,card:xCardData(p),task:null};
+  for(const s of Object.keys(NET.owners))sendState(+s);
+  xPub();
+}
+const xCardData=p=>XG.kind==='sp'?spCardData(p):miCardData(p);
+// Signal envoyé par un téléphone sans tâche en attente (l'espion qui se dévoile)
+function xSpecial(seat,id){
+  if(id==='spy'&&XG&&XG.kind==='sp'&&XG.spy===seat&&XG.signal)XG.signal('spy');
+}
+
+/* ---------- Préparation (commune) ---------- */
+function xSeatsHTML(k){
+  return xNames(k).map((n,i)=>{
+    const ok=!!(NET.kind===k&&NET.owners[i]&&NET.seatKeys[i]&&NET.gr&&NET.gr.peers().some(x=>x.peer===NET.owners[i]));
+    const m=xSeatMode(k,i);
+    const status=m==='central'?'Joue sur ce téléphone':ok?'Joue sur son téléphone · connecté':'Pas encore connecté : jouera ici en attendant';
+    return `<div class="seat"><div class="rn"><b>${esc(n)}</b><span class="${ok&&m==='phone'?'ok':''}">${status}</span></div>
+      <div class="seg"><button type="button" data-act="smode" data-i="${i}" data-v="phone" aria-pressed="${m==='phone'}">Son tél.</button><button type="button" data-act="smode" data-i="${i}" data-v="central" aria-pressed="${m==='central'}">Central</button></div></div>`;
+  }).join('');
+}
+function xRenderSeats(){const l=$('#xSeatList');if(l&&isX(APP))l.innerHTML=xSeatsHTML(APP);}
+const xProblem=k=>k==='sp'?spProblem():miProblem();
+function xRenderSetup(k){
+  APP=k;CL.on=false;
+  document.documentElement.dataset.phase='night';
+  $('#bar').hidden=true;$('#narr').hidden=true;
+  const S=XS[k],D=XDEF[k],n=S.count,prob=xProblem(k),phonesOK=netReady();
+  if(S.mode==='phones'&&!phonesOK)S.mode='single';
+  const netBox=S.mode==='phones'?(NET.on&&NET.kind===k?`<div class="joincode"><span class="eyebrow">Code de la partie</span><span class="code">${esc(NET.code.toUpperCase())}</span></div>
+      ${shareBox(k)}<p class="note">${joinHelp()} Pour chacun, choisissez son téléphone ou ce téléphone central.</p>
+      <p class="eyebrow">Qui joue où ?</p><div class="seats" id="xSeatList">${xSeatsHTML(k)}</div>`:`<p class="note">Ouverture de la salle…</p>`):'';
+  const intro=k==='sp'
+    ?{lead:"Tout le monde connaît le lieu secret, sauf l'espion. Questionnez-vous pour le démasquer… sans trop en dire.",how:[
+      ['La carte.',"Chacun découvre en secret le lieu et son rôle sur place. L'espion, lui, voit seulement la liste des lieux possibles."],
+      ['Les questions.',"Chacun pose à tour de rôle une question à un autre joueur, qui répond puis interroge quelqu'un d'autre."],
+      ['La fin.',"Une accusation unanime, l'espion qui se dévoile pour deviner le lieu, ou le chrono qui s'arrête : on révèle tout."]]}
+    :{lead:"Des résistants doivent réussir trois missions. Des traîtres cachés parmi eux les sabotent en secret. Personne n'est éliminé.",how:[
+      ['Les cartes.',"Chacun découvre son camp en secret. Les traîtres se connaissent ; les résistants ne savent rien."],
+      ["L'équipe.","Le chef propose une équipe, puis tout le monde vote pour ou contre. Le chef change à chaque proposition."],
+      ['La mission.',"Les membres de l'équipe jouent en secret « Réussite » ou « Sabotage ». Un seul sabotage suffit à la faire échouer."]]};
+  $('#main').onclick=null;
+  $('#main').innerHTML=`<div class="body">
+    <button class="link" type="button" data-act="home">← Tous les jeux</button>
+    <header class="hero"><span class="emblem ${D.cls} big">${icon(D.icon,2.2)}</span><h1 class="title">${D.title}</h1><p class="note">${intro.lead}</p>
+      <div class="row wrap">${NET.room&&subtle?`<button class="btn ghost small" type="button" data-act="asplayer">Je suis joueur · rejoindre</button>`:''}<button class="btn ghost small" type="button" data-act="rules">Règles</button></div></header>
+    <ol class="how">${intro.how.map(([a,b])=>`<li><span><b>${a}</b> ${b}</span></li>`).join('')}</ol>
+    <section class="section"><h2>Joueurs</h2>
+      <div class="field"><label>Nombre de joueurs<br><span class="count">de ${D.min} à ${D.max}</span></label>
+        <div class="big-step"><button type="button" data-act="n-" aria-label="Un joueur de moins" ${n<=D.min?'disabled':''}>−</button><output aria-live="polite">${n}</output><button type="button" data-act="n+" aria-label="Un joueur de plus" ${n>=D.max?'disabled':''}>+</button></div></div>
+      <p class="note">Entrez les joueurs dans l'ordre où ils sont assis${k==='mi'?' : le rôle de chef passe de l\'un à l\'autre dans cet ordre':''}. Prénoms facultatifs.</p>
+      <div class="names">${Array.from({length:n},(_,i)=>`<input class="input" id="xname${i}" data-i="${i}" placeholder="Joueur ${i+1}" maxlength="18" autocomplete="off" value="${esc(S.names[i]||'')}">`).join('')}</div>
+      <p class="eyebrow">Plan de table</p>${seatingBlock('xs',xNames(k),xSeatSel)}
+      <p class="eyebrow">Groupes d'amis</p>${groupsHTML('x')}
+    </section>
+    ${k==='sp'?spOptsHTML():miOptsHTML()}
+    <section class="section"><h2>Mode de jeu</h2>
+      <div class="opts">
+        <button class="opt" type="button" data-act="mode" data-v="single" aria-pressed="${S.mode==='single'}"><b>Un seul téléphone</b><span>On se passe le téléphone pour découvrir sa carte, et pour les choix secrets.</span></button>
+        <button class="opt" type="button" data-act="mode" data-v="phones" aria-pressed="${S.mode==='phones'}" ${phonesOK?'':'disabled'}><b>Un téléphone par joueur</b><span>${phonesOK?'Chacun garde sa carte sur son téléphone et y fait ses choix secrets. Ceux qui n\'en ont pas jouent sur ce téléphone.':'Indisponible ici.'}</span></button>
+      </div>
+      ${netBox}
+    </section>
+  </div>
+  <div class="actions">${prob?`<p class="warn">${prob}</p>`:''}<button class="btn" type="button" data-act="start" ${prob?'disabled':''}>${k==='sp'?'Distribuer les cartes':'Distribuer les rôles'}</button></div>`;
+  document.querySelectorAll('.names .input').forEach(inp=>{
+    inp.oninput=()=>{S.names[+inp.dataset.i]=inp.value;xPersist(k);xRenderSeats();};
+    inp.onchange=()=>xPub();
+    inp.onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();const nx=$('#xname'+(+inp.dataset.i+1));if(nx)nx.focus();else inp.blur();}};
+  });
+  const rer=()=>{xPersist(k);xPub();const y=window.scrollY;xRenderSetup(k);window.scrollTo(0,y);};
+  wireGroups('x',()=>xNames(k),null,rer);
+  $('#main').onclick=e=>{
+    const b=e.target.closest('[data-act]');if(!b||b.disabled)return;
+    const a=b.dataset.act;
+    if(a==='home'){renderHome();return;}
+    if(a==='asplayer'){clientMode();return;}
+    if(a==='rules'){const sh=$('#sheet'),p=$('#sheetPanel');sh.hidden=false;p.innerHTML=xRulesHTML(k)+`<button class="btn" type="button" data-u="close">Fermer</button>`;return;}
+    if(a==='start'){if(xProblem(k))return;xPersist(k);(k==='sp'?spStart:miStart)();return;}
+    if(a==='smode'){S.modes[+b.dataset.i]=b.dataset.v;xPersist(k);xRenderSeats();xPub();return;}
+    if(a==='n-'){S.count=Math.max(D.min,S.count-1);xSeatSel=null;}
+    else if(a==='n+'){S.count=Math.min(D.max,S.count+1);xSeatSel=null;}
+    else if(a==='mode'){S.mode=b.dataset.v;if(S.mode==='phones')netStart(k);else netStop();}
+    else if(a.startsWith('xs')){const r=seatingAction('xs',a,+b.dataset.i,xSeatSel,S.count,[S.names,S.modes]);if(r!==undefined)xSeatSel=r;}
+    else if(a==='xgload'){const g=loadGroups()[+b.dataset.i];if(g){S.count=Math.min(D.max,Math.max(D.min,g.names.length));S.names=g.names.slice(0,D.max);}}
+    else if(a==='xgdel'){const gs=loadGroups();gs.splice(+b.dataset.i,1);saveGroups(gs);}
+    else if(a==='opt'){const o=b.dataset.k;S.opt[o]=b.dataset.v!=null?+b.dataset.v:!S.opt[o];if(k==='mi')miFixOpts();}
+    rer();
+  };
+}
+function xGo(k){
+  applyTheme(null,null);
+  xRenderSetup(k);
+  if(XS[k].mode==='phones'&&netReady())netStart(k);else if(NET.on)netStop();
+}
+
+/* ---------- Partie (commun) ---------- */
+function setXBar(){
+  const b=$('#bar');b.hidden=false;b.dataset.h='';
+  const label=XG.phase==='deal'?'Les cartes':XG.phase==='end'?'Fin de partie':XG.kind==='sp'?`Manche ${XG.round}`:`Mission ${Math.min(5,miCur()+1)}`;
+  b.innerHTML=`<span class="phase">${label}</span><span class="spacer"></span>${XG.phase!=='end'&&XG.phase!=='deal'?`<button class="btn small ghost" id="xCardBtn" type="button">Ma carte</button>`:''}<button class="btn small ghost" id="xQuit" type="button">Quitter</button>`;
+}
+document.addEventListener('click',e=>{
+  if(e.target.closest('#xQuit')){
+    const s=$('#sheet'),p=$('#sheetPanel');s.hidden=false;
+    p.innerHTML=`<h2 class="h">Arrêter la partie en cours ?</h2><p class="note">Les cartes de cette partie seront perdues. Les joueurs et les réglages restent enregistrés.</p>
+      <button class="btn wolf" type="button" data-x="stop">Oui, arrêter</button><button class="btn ghost" type="button" data-x="close">Continuer la partie</button>`;
+  }
+  if(e.target.closest('#xCardBtn'))xCardSheet();
+  const who=e.target.closest('[data-xwho]');if(who){xCardSheet(+who.dataset.xwho);return;}
+  const show=e.target.closest('[data-xshow]');if(show){xCardSheet(+show.dataset.xshow,true);return;}
+  const x=e.target.closest('[data-x]');
+  if(x){$('#sheet').hidden=true;if(x.dataset.x==='stop')xStop();}
+});
+document.addEventListener('visibilitychange',()=>{if(XG&&document.visibilityState==='visible')keepAwake();});
+// Revoir sa carte sur le téléphone central (pour les joueurs qui y jouent)
+function xCardSheet(id,reveal){
+  if(!XG)return;
+  const s=$('#sheet'),p=$('#sheetPanel');s.hidden=false;
+  const central=XG.players.filter(q=>!xRemoteOK(q));
+  if(id==null){
+    p.innerHTML=`<p class="eyebrow">Ma carte</p><h2 class="h">Qui es-tu ?</h2><p class="note">Les autres détournent le regard.${central.length<XG.players.length?' Les joueurs connectés retrouvent leur carte sur leur téléphone.':''}</p>
+      <div class="tiles">${central.map(q=>`<button class="tile" type="button" data-xwho="${q.id}"><span>${esc(q.name)}</span></button>`).join('')}</div>
+      <button class="btn ghost" type="button" data-x="close">Annuler</button>`;
+  } else if(!reveal){
+    p.innerHTML=`<p class="eyebrow">Ma carte</p><h2 class="h">${esc(XP(id).name)}, c'est bien toi ?</h2><p class="note">Ta carte va s'afficher.</p>
+      <button class="btn" type="button" data-xshow="${id}">Oui, afficher ma carte</button><button class="btn ghost" type="button" data-x="close">Annuler</button>`;
+  } else {
+    p.innerHTML=`<p class="eyebrow">${esc(XP(id).name)}</p>${xCardHTML(xCardData(XP(id)))}<button class="btn" type="button" data-x="close">Cacher</button>`;
+  }
+}
+function xCardHTML(c){
+  if(!c)return '';
+  if(c.game==='sp'){
+    if(c.spy)return `<div class="card wolf"><span class="team">Tu es l'espion</span><div class="glyph">${icon('mask',2.2)}</div><h3 class="card-name">Espion</h3><p class="card-desc">Tu ne connais pas le lieu. Écoute, fonds-toi dans la masse et devine-le. Voici les lieux possibles :</p></div>
+      <div class="loclist">${c.list.map(l=>`<button type="button" class="locitem ${CL.cross&&CL.cross.has(l)?'off':''}" data-cross="${esc(l)}">${esc(l)}</button>`).join('')}</div><p class="note" style="text-align:center">Touche un lieu pour le rayer.</p>`;
+    return `<div class="card"><span class="team">Lieu secret</span><div class="glyph">${icon('house',2.2)}</div><h3 class="card-name">${esc(c.loc)}</h3><p class="card-desc">Ton rôle sur place : <b>${esc(c.role)}</b>. Réponds aux questions sans trop en dire : l'espion écoute.</p></div>`;
+  }
+  const r=MI_ROLES[c.role]||MI_ROLES.resistant;
+  return `<div class="card ${r.team==='traitre'?'wolf':''}"><span class="team">${r.team==='traitre'?'Les traîtres':'La résistance'}</span><div class="glyph">${icon(r.icon,2.2)}</div><h3 class="card-name">${r.name}</h3><p class="card-desc">${r.desc}</p></div>
+    ${(c.know||[]).map(x=>`<p class="note" style="text-align:center"><b>${esc(x)}</b></p>`).join('')}`;
+}
+// Rayer des lieux (l'espion, sur son téléphone ou dans « Ma carte »)
+document.addEventListener('click',e=>{
+  const c=e.target.closest('[data-cross]');if(!c)return;
+  CL.cross=CL.cross||new Set();const l=c.dataset.cross;
+  if(CL.cross.has(l))CL.cross.delete(l);else CL.cross.add(l);
+  c.classList.toggle('off',CL.cross.has(l));
+});
+async function xDeal(){
+  const rem=XG.players.filter(xRemoteOK),seen=new Set();
+  const task=p=>({t:'info',eyebrow:`${p.name}, ta carte`,xcard:xCardData(p),btn:"C'est noté"});
+  let progress=()=>{};
+  const remAll=Promise.all(rem.map(p=>remoteTask(p.id,task(p)).then(()=>{seen.add(p.id);progress();})));
+  const local=XG.players.filter(p=>!rem.includes(p));
+  for(const [i,p] of local.entries()){
+    view(`<p class="eyebrow">Carte ${i+1} sur ${local.length}</p><p class="lead">Passe le téléphone à</p><p class="bigname">${esc(p.name)}</p><p class="note">Les autres joueurs détournent le regard.</p>`,
+      `<button class="btn" type="button" data-act="see">Je suis ${esc(p.name)} · voir ma carte</button>`);
+    await ask();
+    await xTask(task(p));
+  }
+  if(rem.length){
+    progress=()=>{const l=$('#dealList');if(l)l.innerHTML=rem.map(p=>`<span class="pill ${seen.has(p.id)?'':'off'}">${esc(p.name)}${seen.has(p.id)?' ✓':''}</span>`).join('');};
+    view(`<p class="eyebrow">Les cartes</p><h2 class="h">Chacun découvre sa carte sur son téléphone.</h2><div class="namelist" id="dealList"></div>`,
+      `<button class="btn ghost" type="button" data-act="skip">Continuer sans attendre</button>`);
+    progress();
+    await Promise.race([remAll,ask()]);
+    rem.forEach(p=>cancelTasks(p.id));
+  }
+}
+// Choix secrets de plusieurs joueurs : sur leur téléphone, ou à tour de rôle sur le téléphone central
+async function xCollect(voters,taskFn,eyebrow){
+  const votes={};
+  const rem=voters.filter(xRemoteOK),loc=voters.filter(v=>!xRemoteOK(v));
+  let onBoard=false,closeRes;const closeP=track(r=>{closeRes=r;});
+  const board=()=>{
+    if(!onBoard)return;
+    const k=Object.keys(votes).length;
+    view(`<p class="eyebrow">${esc(eyebrow)}</p><h2 class="h">Chacun choisit sur son téléphone.</h2>
+      <div class="namelist">${voters.map(v=>`<span class="pill ${v.id in votes?'':'off'}">${esc(v.name)}${v.id in votes?' ✓':''}</span>`).join('')}</div><p class="note">${k} sur ${voters.length}.</p>`,
+      `<button class="btn ghost" type="button" id="closeVote">Clore maintenant</button>`);
+    const b=$('#closeVote');if(b)b.onclick=()=>closeRes&&closeRes();
+  };
+  const rps=rem.map(v=>remoteTask(v.id,taskFn(v)).then(x=>{votes[v.id]=x;board();}));
+  for(const v of loc){
+    view(`<p class="eyebrow">${esc(eyebrow)} · en secret</p><p class="lead">Passe le téléphone à</p><p class="bigname">${esc(v.name)}</p><p class="note">Les autres détournent le regard.</p>`,
+      `<button class="btn" type="button" data-act="v">Je suis ${esc(v.name)} · choisir</button>`);
+    await ask();
+    votes[v.id]=await xTask(taskFn(v));
+  }
+  if(rem.some(v=>!(v.id in votes))){onBoard=true;board();await Promise.race([Promise.all(rps),closeP]);}
+  rem.forEach(v=>cancelTasks(v.id));
+  return votes;
+}
+async function xRun(resumed){
+  let next;
+  try{
+    if(!resumed){XG.phase='deal';setXBar();xPub();await xDeal();}
+    else await xResumeScreen();
+    const w=XG.kind==='sp'?await spRound():await miLoop();
+    next=await (XG.kind==='sp'?spFinish(w):miFinish(w));
+  }catch(e){if(e!==ABORT)console.error(e);return;}
+  clearXSave();
+  const k=XG.kind;
+  if(next==='again')(k==='sp'?spStart:miStart)();
+  else if(next==='home'){XG=null;xNetInit();renderHome();}
+  else{XG=null;xNetInit();xRenderSetup(k);window.scrollTo(0,0);}
+}
+function xStop(){abortGame();const k=XG?XG.kind:APP;XG=null;clearXSave();xNetInit();xRenderSetup(k);window.scrollTo(0,0);}
+function xNewGame(kind,players,extra){
+  abortGame();
+  const S=XS[kind];
+  XG=Object.assign({kind,gid:Math.random().toString(36).slice(2,10),round:0,phase:'deal',log:[],
+    players,central:new Set(players.map(p=>p.id).filter(i=>S.mode!=='phones'||xSeatMode(kind,i)==='central'))},extra);
+  APP=kind;CL.cross=new Set();unlockAudio();
+  if(S.mode==='phones'&&NET.on&&NET.kind===kind)xNetInit();
+  setXBar();window.scrollTo(0,0);keepAwake();
+  xRun(false);
+}
+/* Sauvegarde : la partie reprend au début de l'étape en cours si la page se recharge */
+const X_SAVE='x-save';
+function saveX(){if(!XG)return;try{const g=Object.assign({},XG,{central:[...XG.central],signal:null});store.set(X_SAVE,{v:1,t:Date.now(),mode:XS[XG.kind].mode,XG:g});}catch(e){}}
+const clearXSave=()=>{try{localStorage.removeItem(X_SAVE);}catch(e){}};
+function loadXSave(){const s=store.get(X_SAVE,null);if(!s||s.v!==1||!s.XG||!isX(s.XG.kind)||Date.now()-s.t>12*3600e3)return null;return s;}
+function resumeX(){
+  const s=loadXSave();if(!s)return;
+  abortGame();
+  XG=Object.assign(s.XG,{central:new Set(s.XG.central||[])});
+  const k=XG.kind;XS[k].mode=s.mode;APP=k;CL.on=false;applyTheme(null,null);
+  if(XS[k].mode==='phones'&&netReady())netStart(k).then(()=>xNetInit());
+  setXBar();window.scrollTo(0,0);
+  xRun(true);
+}
+async function xResumeScreen(){
+  const remote=XG.players.filter(p=>!XG.central.has(p.id));
+  const box=()=>NET.on&&NET.kind===XG.kind&&remote.length?`<div class="joincode"><span class="eyebrow">Nouveau code de la partie</span><span class="code">${esc((NET.code||'').toUpperCase())}</span></div>
+    ${shareBox(XG.kind)}<p class="note">Les joueurs sur téléphone rejoignent avec ce code et retrouvent leur carte.</p>
+    <div class="namelist">${remote.map(p=>`<span class="pill ${xRemoteOK(p)?'':'off'}">${esc(p.name)}${xRemoteOK(p)?' ✓':''}</span>`).join('')}</div>`:'';
+  view(`<p class="eyebrow">Partie reprise</p><h2 class="h">On reprend là où vous en étiez.</h2><p class="note">Les cartes et le score sont conservés.</p><div id="xResumeBox">${box()}</div>`,
+    `<button class="btn" type="button" data-act="go">Reprendre la partie</button>`);
+  const iv=setInterval(()=>{const b=$('#xResumeBox');if(b)b.innerHTML=box();},1500);
+  try{await ask();}finally{clearInterval(iv);}
+}
+function xEndButtons(again){
+  return `<button class="btn" type="button" data-act="again">${again}</button><div class="row"><button class="btn ghost small" type="button" data-act="setup">Changer les réglages</button><button class="btn ghost small" type="button" data-act="home">Tous les jeux</button></div>`;
+}
+
+/* ================= L'Espion ================= */
+const SP_LOCS=[
+  ['Hôpital',['Chirurgien','Infirmière','Patient','Visiteur','Anesthésiste','Interne','Brancardier']],
+  ['Sous-marin',['Commandant','Mécanicien','Cuisinier','Sonariste','Matelot','Opérateur radio','Médecin de bord']],
+  ['Mariage',['Mariée','Marié','Témoin','Photographe','Traiteur','Belle-mère','DJ']],
+  ['Plage',['Maître-nageur','Vendeur de glaces','Surfeur','Touriste','Enfant','Photographe','Retraité']],
+  ['Avion',['Pilote','Hôtesse de l\'air','Passager en classe affaires','Passager en classe éco','Copilote','Mécanicien','Parent avec un bébé']],
+  ['Restaurant gastronomique',['Chef','Sommelier','Serveur','Critique gastronomique','Client','Plongeur','Maître d\'hôtel']],
+  ['Banque',['Directeur d\'agence','Guichetier','Client','Agent de sécurité','Braqueur','Conseiller','Convoyeur de fonds']],
+  ['École',['Professeur','Directrice','Élève','Surveillant','Cantinière','Parent d\'élève','Concierge']],
+  ['Commissariat',['Commissaire','Inspecteur','Suspect','Avocat','Témoin','Agent d\'accueil','Journaliste']],
+  ['Station de ski',['Moniteur','Skieur débutant','Perchman','Secouriste','Loueur de skis','Snowboardeur','Touriste']],
+  ['Cirque',['Clown','Dompteur','Acrobate','Jongleur','Spectateur','Magicien','Monsieur Loyal']],
+  ['Plateau de télévision',['Présentateur','Caméraman','Invité','Maquilleuse','Régisseur','Candidat','Spectateur']],
+  ['Supermarché',['Caissière','Client','Vigile','Chef de rayon','Livreur','Boucher','Directeur du magasin']],
+  ['Train de nuit',['Contrôleur','Passager','Conducteur','Serveur du wagon-bar','Voyageur sans billet','Touriste','Policier en civil']],
+  ['Musée',['Gardien','Guide','Touriste','Restaurateur d\'art','Directrice','Voleur de tableaux','Étudiant']],
+  ['Chantier',['Chef de chantier','Grutier','Maçon','Architecte','Électricien','Stagiaire','Inspecteur']],
+  ['Festival de musique',['Chanteur','Ingénieur du son','Festivalier','Agent de sécurité','Vendeur de frites','Bénévole','Manager']],
+  ['Salle de sport',['Coach','Culturiste','Débutant','Réceptionniste','Kiné','Nutritionniste','Habitué']],
+  ['Bateau de croisière',['Capitaine','Animateur','Croisiériste','Barman','Serveur','Musicien','Mécanicien']],
+  ['Château fort',['Roi','Reine','Chevalier','Bouffon','Garde','Forgeron','Prisonnier']],
+  ['Station spatiale',['Commandant','Ingénieur','Scientifique','Médecin','Touriste de l\'espace','Pilote','Technicien']],
+  ['Zoo',['Soigneur','Vétérinaire','Visiteur','Enfant','Guide','Photographe','Vendeur de souvenirs']],
+  ['Casino',['Croupier','Joueur','Directeur','Agent de sécurité','Serveuse','Tricheur','Touriste']],
+  ['Camping',['Campeur','Gardien du camping','Animateur','Pêcheur','Famille en vacances','Randonneur','Vendeur de pain']],
+  ['Boulangerie',['Boulanger','Pâtissier','Vendeuse','Client','Livreur','Apprenti','Habitué']],
+  ['Mairie',['Maire','Secrétaire','Agent d\'accueil','Habitant','Couple qui se marie','Conseiller municipal','Journaliste']],
+  ['Open space',['Manager','Stagiaire','Développeur','Comptable','Responsable RH','Commercial','Assistant']],
+  ['Discothèque',['DJ','Videur','Barman','Danseur','Client','Serveuse','Photographe']],
+  ['Pharmacie',['Pharmacien','Préparatrice','Client','Livreur','Stagiaire','Représentant','Patient']],
+  ['Ferme',['Fermier','Fermière','Vétérinaire','Vendeur au marché','Enfant en visite','Conducteur de tracteur','Apprenti']]
+];
+const SP_NAMES=SP_LOCS.map(l=>l[0]).sort((a,b)=>a.localeCompare(b,'fr'));
+const spUsed=new Set(store.get('sp-used',[]));
+function spProblem(){const S=XS.sp;if(S.count<3)return 'Il faut au moins 3 joueurs.';return '';}
+function spOptsHTML(){
+  const m=XS.sp.opt.minutes||8;
+  return `<section class="section"><h2>Manche</h2>
+    <div class="field"><label>Durée des questions<br><span class="count">Au bout du temps, on désigne ensemble l'espion.</span></label>
+      <div class="seg">${[6,8,10].map(v=>`<button type="button" data-act="opt" data-k="minutes" data-v="${v}" aria-pressed="${m===v}">${v} min</button>`).join('')}</div></div>
+    <p class="note">${SP_LOCS.length} lieux, chacun avec 7 rôles. Un lieu déjà joué ne revient pas avant que tous l'aient été.</p></section>`;
+}
+function spCardData(p){return p.id===XG.spy?{game:'sp',spy:true,list:SP_NAMES}:{game:'sp',spy:false,loc:XG.loc,role:p.role};}
+function spStart(){
+  const names=xNames('sp'),n=names.length;
+  let fresh=SP_LOCS.filter(l=>!spUsed.has(l[0]));
+  if(!fresh.length){spUsed.clear();fresh=SP_LOCS.slice();}
+  const L=fresh[Math.floor(Math.random()*fresh.length)];spUsed.add(L[0]);store.set('sp-used',[...spUsed]);
+  const roles=shuffle(L[1].slice());while(roles.length<n)roles.push(L[1][Math.floor(Math.random()*L[1].length)]);
+  const spy=Math.floor(Math.random()*n);
+  const players=names.map((name,i)=>({id:i,name,role:i===spy?'espion':roles[i]}));
+  const minutes=XS.sp.opt.minutes||8;
+  xNewGame('sp',players,{loc:L[0],spy,left:minutes*60,first:Math.floor(Math.random()*n),accused:[],round:1});
+}
+// La manche : questions chronométrées, jusqu'à une accusation, l'espion qui se dévoile, ou la fin du temps
+async function spRound(){
+  XG.phase='talk';setXBar();saveX();xPub();
+  while(true){
+    const ev=await spTalk();
+    if(ev==='time'){
+      const r=await spFinalVote();if(r)return r;
+      continue;
+    }
+    if(ev==='spy'){return await spGuess(false);}
+    if(ev==='acc'){const r=await spAccuse();if(r)return r;}
+  }
+}
+function spTalk(){
+  return track((res,h)=>{
+    const fmt=s=>`${Math.floor(s/60)}:${String(Math.max(0,s)%60).padStart(2,'0')}`;
+    let iv=null;
+    const done=v=>{clearInterval(iv);XG.signal=null;$('#main').onclick=null;saveX();res(v);};
+    h.cleanup=()=>{clearInterval(iv);XG.signal=null;};
+    XG.signal=v=>done(v);
+    const can=XG.players.filter(p=>!XG.accused.includes(p.id));
+    view(`<p class="eyebrow">Manche ${XG.round} · questions</p><div class="clock" id="spclock">${fmt(XG.left)}</div>
+      ${XG.left===(XS.sp.opt.minutes||8)*60?`<p class="lead" style="text-align:center">C'est <b>${esc(XP(XG.first).name)}</b> qui pose la première question.</p>`:''}
+      <p class="note">Chacun pose une question à un autre joueur, qui répond puis interroge quelqu'un d'autre (jamais celui qui vient de l'interroger). Restez vagues : l'espion écoute.</p>
+      <p class="note">Un trou de mémoire ? « Ma carte », en haut, pour revoir la sienne.</p>`,
+      `<div class="row"><button class="btn wolf" type="button" data-act="acc" ${can.length?'':'disabled'}>J'accuse quelqu'un</button><button class="btn ghost" type="button" data-act="spy">L'espion se dévoile</button></div>
+       <div class="row"><button class="btn ghost small" type="button" data-act="plus">+1 minute</button><button class="btn ghost small" type="button" data-act="stop">Arrêter le chrono</button></div>`);
+    $('#main').onclick=e=>{
+      const a=e.target.closest('[data-act]');if(!a||a.disabled)return;
+      const k=a.dataset.act;
+      if(k==='plus'){XG.left+=60;const c=$('#spclock');if(c)c.textContent=fmt(XG.left);return;}
+      if(k==='stop'){done('time');return;}
+      if(k==='acc')done('acc');
+      if(k==='spy')spConfirmSpy(done);
+    };
+    iv=setInterval(()=>{
+      XG.left--;const c=$('#spclock');
+      if(c){c.textContent=fmt(XG.left);c.classList.toggle('low',XG.left<=30);}
+      if(XG.left%5===0)xPub();
+      if(XG.left===30)chime('night');
+      if(XG.left<=0){chime('day');done('time');}
+    },1000);
+  });
+}
+// L'espion se dévoile depuis le téléphone central : on demande confirmation (un autre joueur pourrait toucher par erreur)
+function spConfirmSpy(done){
+  const s=$('#sheet'),p=$('#sheetPanel');s.hidden=false;
+  p.innerHTML=`<h2 class="h">L'espion se dévoile ?</h2><p class="note">Seul l'espion doit confirmer : il annonce qu'il est l'espion et tente de deviner le lieu. S'il trouve, il gagne ; sinon, il perd.</p>
+    <button class="btn wolf" type="button" id="spYes">Je suis l'espion · deviner le lieu</button><button class="btn ghost" type="button" id="spNo">Annuler</button>`;
+  $('#spYes').onclick=()=>{s.hidden=true;done('spy');};
+  $('#spNo').onclick=()=>{s.hidden=true;};
+}
+async function spGuess(caught){
+  const spy=XP(XG.spy);
+  XG.phase='guess';setXBar();xPub();
+  if(!caught){
+    view(`<p class="eyebrow">L'espion se dévoile</p><p class="bigname">${esc(spy.name)}</p><p class="lead" style="text-align:center">était l'espion !</p>`,`<button class="btn" type="button" data-act="ok">Il devine le lieu</button>`);
+    await ask();
+  }
+  const g=await xAct(spy,{t:'choice',eyebrow:caught?"Dernière chance de l'espion":"L'espion devine",title:`${spy.name}, où sommes-nous ?`,note:caught?'Démasqué, tu peux encore gagner en trouvant le lieu.':'Une seule tentative.',opts:SP_NAMES.map(l=>[l,l,'ghost'])});
+  const ok=g===XG.loc;
+  XG.guess=g;
+  xLog(`L'espion (${spy.name}) propose « ${g} » : ${ok?'gagné':'raté'}.`);
+  view(`<p class="eyebrow">L'espion propose</p><p class="bigname">« ${esc(g)} »</p><p class="result ${ok?'yes':'no'}">${ok?'Bonne réponse !':`Raté ! Le lieu était : ${esc(XG.loc)}.`}</p>`,`<button class="btn" type="button" data-act="ok">Voir le résultat</button>`);
+  await ask();
+  return ok?{w:'spy',how:'guess'}:{w:'agents',how:caught?'caught':'missed'};
+}
+async function spAccuse(){
+  const can=XG.players.filter(p=>!XG.accused.includes(p.id));
+  XG.phase='accuse';setXBar();xPub();
+  const by=await xTask({t:'pick',eyebrow:'Accusation',title:'Qui accuse ?',note:'Chacun ne peut accuser qu\'une fois par manche.',ids:can.map(p=>p.id),confirm:'C\'est moi',alt:'Annuler'});
+  if(by==null){XG.phase='talk';setXBar();return null;}
+  const target=await xTask({t:'pick',eyebrow:'Accusation',title:`${XP(by).name}, qui accuses-tu ?`,ids:XG.players.filter(p=>p.id!==by).map(p=>p.id),confirm:'Accuser',alt:'Annuler',tone:'wolf'});
+  if(target==null){XG.phase='talk';setXBar();return null;}
+  XG.accused.push(by);
+  const t=XP(target);
+  const v=await xTask({t:'choice',eyebrow:'Accusation',lead:`${XP(by).name} accuse`,big:t.name,title:'Tout le monde est-il d\'accord ?',note:`Votez à main levée. L'accusation n'aboutit que si tous les joueurs sauf ${t.name} sont d'accord.`,
+    opts:[['yes','Oui, à l\'unanimité','wolf'],['no','Non, on continue','ghost']]});
+  if(v!=='yes'){xLog(`${XP(by).name} accuse ${t.name} : pas d'unanimité.`);XG.phase='talk';setXBar();return null;}
+  xLog(`${XP(by).name} accuse ${t.name}, à l'unanimité.`);
+  XG.accuser=by;
+  return await spReveal(target);
+}
+async function spFinalVote(){
+  XG.phase='vote';setXBar();xPub();
+  view(`<p class="eyebrow">Fin du temps</p><h2 class="h">Désignez ensemble l'espion.</h2><p class="note">${XS.sp.mode==='phones'?'Chacun vote en secret ; le joueur qui a le plus de voix est démasqué. En cas d\'égalité, l\'espion s\'échappe.':'Discutez, votez à main levée, puis touchez le joueur qui a le plus de voix. Pas de majorité ? L\'espion s\'échappe.'}</p>`,
+    `<button class="btn" type="button" data-act="ok">Voter</button>`);
+  await ask();
+  let id=null;
+  if(XS.sp.mode==='phones'){
+    const votes=await xCollect(XG.players,v=>({t:'pick',eyebrow:'Qui est l\'espion ?',title:'Ton vote',ids:XG.players.filter(p=>p.id!==v.id).map(p=>p.id),confirm:'Voter',tone:'wolf'}),'Vote final');
+    const cnt={};for(const v of Object.values(votes))if(v!=null)cnt[v]=(cnt[v]||0)+1;
+    const max=Math.max(0,...Object.values(cnt)),top=Object.keys(cnt).filter(k=>cnt[k]===max).map(Number);
+    await tallyReveal('Vote final',shuffle(Object.values(votes).filter(v=>v!=null).map(v=>({t:v,w:1}))),[],XG.players.length-Object.values(votes).filter(v=>v!=null).length,i=>XP(i).name);
+    id=max>0&&top.length===1?top[0]:null;
+  } else {
+    id=await xTask({t:'pick',eyebrow:'Vote final',title:'Qui le groupe désigne-t-il ?',ids:XG.players.map(p=>p.id),confirm:'Démasquer',alt:'Pas de majorité : l\'espion s\'échappe',tone:'wolf'});
+  }
+  if(id==null){
+    xLog("Pas de majorité : l'espion s'échappe.");
+    view(`<p class="eyebrow">Vote final</p><h2 class="h">Pas de majorité.</h2><p class="note" style="text-align:center">L'espion s'échappe !</p>`,`<button class="btn" type="button" data-act="ok">Qui était-ce ?</button>`);
+    await ask();
+    return {w:'spy',how:'escape'};
+  }
+  return await spReveal(id);
+}
+async function spReveal(id){
+  const t=XP(id),isSpy=id===XG.spy;
+  XG.phase='reveal';setXBar();xPub();
+  view(`<p class="eyebrow wolf">Démasqué ?</p><p class="bigname">${esc(t.name)}</p>${spFlip(t)}`);
+  drumRoll(2.2);await wait(2400);
+  flipNow();revealSting(isSpy?'loups':'village');await wait(1000);
+  xLog(`${t.name} était ${isSpy?"l'espion":'innocent ('+t.role+')'}.`);
+  view(`<p class="eyebrow wolf">Démasqué ?</p><p class="bigname">${esc(t.name)}</p>${spFlip(t,true)}<p class="result ${isSpy?'yes':'no'}">${isSpy?'C\'était bien l\'espion !':'Innocent ! L\'espion a gagné.'}</p>`,
+    `<button class="btn" type="button" data-act="ok">${isSpy?'Sa dernière chance':'Voir le résultat'}</button>`);
+  await ask();
+  if(!isSpy)return {w:'spy',how:'wrong'};
+  return await spGuess(true);
+}
+function spFlip(p,open){
+  const front=p.id===XG.spy?`<div class="card wolf"><span class="team">Démasqué</span><div class="glyph">${icon('mask',2.2)}</div><h3 class="card-name">Espion</h3></div>`
+    :`<div class="card"><span class="team">${esc(XG.loc)}</span><div class="glyph">${icon('house',2.2)}</div><h3 class="card-name">${esc(p.role)}</h3></div>`;
+  return `<div class="flip ${open?'on':''}" id="flip"><div class="flip-inner"><div class="flip-face flip-back"><div class="card back"><span class="team">Qui était-ce ?</span><div class="glyph">${icon('eye',2.2)}</div><h3 class="card-name">?</h3></div></div><div class="flip-face flip-front">${front}</div></div></div>`;
+}
+async function spFinish(r){
+  XG.phase='end';setXBar();xPub();
+  for(const p of XG.players)cancelTasks(p.id);
+  window.scrollTo(0,0);
+  const spy=XP(XG.spy);
+  const res=XG.players.map(p=>{
+    const isSpy=p.id===XG.spy;let won=r.w==='spy'?isSpy:!isSpy,pts=0;
+    if(won)pts=isSpy?(r.how==='guess'?3:2):(XG.accuser===p.id?2:1);
+    return {name:p.name,role:isSpy?'espion':'agent',won,pts};
+  });
+  recordGame('sp',res);clearXSave();
+  const head=r.w==='spy'?"L'espion a gagné":'Les agents ont gagné';
+  const sub={guess:`${spy.name} a deviné le lieu.`,escape:"Pas de majorité au vote final : l'espion s'est échappé.",wrong:'Un innocent a été accusé à tort.',caught:"Démasqué, l'espion n'a pas trouvé le lieu.",missed:"L'espion s'est dévoilé mais s'est trompé de lieu."}[r.how]||'';
+  view(`<p class="eyebrow">Fin de manche</p><h2 class="h">${head}</h2><p class="note">${esc(sub)}</p>
+    <div class="words"><div><span class="eyebrow">Le lieu</span><b>${esc(XG.loc)}</b></div><div><span class="eyebrow">L'espion</span><b>${esc(spy.name)}</b></div></div>
+    <ul class="roster">${XG.players.map((p,i)=>`<li><span class="nm">${esc(p.name)}</span><span class="pill ${p.id===XG.spy?'wolf':''}">${esc(p.id===XG.spy?'Espion':p.role)}</span>${res[i].pts?`<span class="pts">+${res[i].pts}</span>`:''}</li>`).join('')}</ul>`,
+    xEndButtons('Manche suivante'));
+  return await ask();
+}
+
+/* ================= Les Missions ================= */
+const MI_ROLES={
+  resistant:{name:'Résistant',team:'resistance',icon:'shield',desc:"Fais réussir trois missions. Tu ne sais pas qui sont les traîtres : observe les votes et les équipes."},
+  merlin:{name:'Merlin',team:'resistance',icon:'eye',desc:"Tu connais les traîtres. Guide la résistance sans te faire repérer : si elle gagne, l'assassin essaiera de te trouver."},
+  perceval:{name:'Perceval',team:'resistance',icon:'sword',desc:"Tu sais qui est Merlin… mais Morgane se fait passer pour lui. Protège le vrai Merlin."},
+  traitre:{name:'Traître',team:'traitre',icon:'mask',desc:"Fais échouer trois missions, ou fais refuser cinq équipes de suite. Tu connais tes complices."},
+  assassin:{name:'Assassin',team:'traitre',icon:'target',desc:"Traître. Si la résistance gagne trois missions, tu as une dernière chance : désigne Merlin, et les traîtres gagnent."},
+  morgane:{name:'Morgane',team:'traitre',icon:'masks',desc:"Traîtresse. Perceval te voit comme un possible Merlin : sème le doute."},
+  mordred:{name:'Mordred',team:'traitre',icon:'fangs',desc:"Traître. Merlin ne te voit pas : tu es le mieux caché de tous."},
+  oberon:{name:'Obéron',team:'traitre',icon:'blank',desc:"Traître solitaire : tu ne connais pas tes complices, et ils ne te connaissent pas."}
+};
+const MI_TRAITORS={5:2,6:2,7:3,8:3,9:3,10:4};
+const MI_SIZES={5:[2,3,2,3,3],6:[2,3,4,3,4],7:[2,3,3,4,4],8:[3,4,4,5,5],9:[3,4,4,5,5],10:[3,4,4,5,5]};
+const miIsTraitor=p=>MI_ROLES[p.role].team==='traitre';
+function miFixOpts(){const o=XS.mi.opt;if(!o.merlin){o.perceval=false;o.mordred=false;}}
+function miSpecials(){
+  const o=XS.mi.opt,t=[],r=[];
+  if(o.merlin){r.push('merlin');t.push('assassin');}
+  if(o.merlin&&o.perceval){r.push('perceval');t.push('morgane');}
+  if(o.merlin&&o.mordred)t.push('mordred');
+  if(o.oberon)t.push('oberon');
+  return {t,r};
+}
+function miProblem(){
+  const n=XS.mi.count;if(n<5)return 'Il faut au moins 5 joueurs.';
+  const {t}=miSpecials();if(t.length>MI_TRAITORS[n])return `Trop de rôles de traîtres pour ${n} joueurs (${MI_TRAITORS[n]} traîtres) : retirez une option.`;
+  return '';
+}
+function miOptsHTML(){
+  const o=XS.mi.opt,n=XS.mi.count;
+  const sw=(k,label,sub,dis)=>`<div class="field"><label>${label}<br><span class="count">${sub}</span></label><button class="switch" type="button" role="switch" aria-checked="${!!o[k]}" aria-label="${label}" data-act="opt" data-k="${k}" ${dis?'disabled':''}></button></div>`;
+  return `<section class="section"><h2>Rôles <span class="count">${MI_TRAITORS[n]} traîtres sur ${n}</span></h2>
+    <p class="note">Missions de ${MI_SIZES[n].join(', ')} joueurs.${n>=7?' La 4e mission n\'échoue qu\'avec deux sabotages.':''}</p>
+    ${sw('merlin','Merlin et l\'assassin','Merlin connaît les traîtres. Si la résistance gagne, l\'assassin peut encore tout renverser en le démasquant.')}
+    ${sw('perceval','Perceval et Morgane','Perceval sait qui est Merlin, mais Morgane se fait passer pour lui.',!o.merlin)}
+    ${sw('mordred','Mordred','Un traître que Merlin ne voit pas.',!o.merlin)}
+    ${sw('oberon','Obéron','Un traître isolé : ni lui ni ses complices ne se connaissent.')}
+  </section>`;
+}
+function miCardData(p){
+  const r=p.role,know=[],others=XG.players.filter(q=>q.id!==p.id);
+  const names=list=>joinFr(list.map(q=>q.name));
+  if(MI_ROLES[r].team==='traitre'&&r!=='oberon'){const c=others.filter(q=>miIsTraitor(q)&&q.role!=='oberon');know.push(c.length?`Tes complices : ${names(c)}.`:'Tu es le seul traître visible.');if(XG.players.some(q=>q.role==='oberon'))know.push('Obéron est aussi un traître, mais tu ne sais pas qui.');}
+  if(r==='oberon')know.push('Tu ne connais pas tes complices.');
+  if(r==='merlin'){const c=others.filter(q=>miIsTraitor(q)&&q.role!=='mordred');know.push(`Les traîtres : ${names(c)}.`);if(XG.players.some(q=>q.role==='mordred'))know.push('Mordred est caché parmi les autres.');}
+  if(r==='perceval'){const c=shuffle(others.filter(q=>q.role==='merlin'||q.role==='morgane'));know.push(c.length>1?`Merlin est l'un de ces deux joueurs : ${names(c)}.`:`Merlin : ${names(c)}.`);}
+  return {game:'mi',role:r,know};
+}
+function miStart(){
+  const names=xNames('mi'),n=names.length,{t,r}=miSpecials();
+  const roles=t.concat(Array(MI_TRAITORS[n]-t.length).fill('traitre'),r);
+  while(roles.length<n)roles.push('resistant');
+  shuffle(roles);
+  const players=names.map((name,i)=>({id:i,name,role:roles[i]}));
+  xNewGame('mi',players,{missions:MI_SIZES[n].map((size,i)=>({size,fails:i===3&&n>=7?2:1,result:null,sab:0,team:[]})),leader:Math.floor(Math.random()*n),rejects:0,hist:[],round:1});
+}
+const miCur=()=>XG&&XG.missions?Math.max(0,XG.missions.findIndex(m=>!m.result)):0;
+function miBoardData(){
+  if(!XG||XG.kind!=='mi')return null;
+  return {missions:XG.missions.map(m=>({size:m.size,fails:m.fails,result:m.result,sab:m.sab})),cur:miCur(),leader:XG.leader,team:XG.team||[],rejects:XG.rejects,
+    hist:XG.hist.slice(-6).map(h=>({m:h.m,leader:h.leader,team:h.team,yes:h.yes,no:h.no,ok:h.ok}))};
+}
+function miBoardHTML(b,names){
+  if(!b)return '';
+  const nm=i=>esc(names[i]==null?'?':names[i]);
+  return `<div class="mboard">${b.missions.map((m,i)=>`<div class="mslot ${m.result||''} ${i===b.cur&&!m.result?'cur':''}"><b>${m.size}</b><small>${m.result==='ok'?'Réussie':m.result==='ko'?`${m.sab} sabotage${m.sab>1?'s':''}`:m.fails>1?'2 sabotages':'Mission '+(i+1)}</small></div>`).join('')}</div>
+    <div class="mrej"><span class="eyebrow">Équipes refusées d'affilée</span><span>${[0,1,2,3,4].map(i=>`<i class="${i<b.rejects?'on':''}"></i>`).join('')}</span></div>
+    ${b.hist.length?`<p class="eyebrow">Historique</p><ul class="mhist">${b.hist.slice().reverse().map(h=>`<li><b>M${h.m+1}</b> · chef ${nm(h.leader)} · ${h.team.map(nm).join(', ')} <span class="${h.ok===true?'ok':h.ok===false?'ko':''}">${h.ok===null?'refusée':h.ok?'réussie':'sabotée'}</span>${h.yes?`<br><small>Pour : ${h.yes.map(nm).join(', ')||'personne'}${h.no&&h.no.length?' · Contre : '+h.no.map(nm).join(', '):''}</small>`:''}</li>`).join('')}</ul>`:''}`;
+}
+async function miLoop(){
+  const n=XG.players.length;
+  while(true){
+    const mi=miCur(),M=XG.missions[mi];
+    XG.phase='team';XG.team=[];setXBar();saveX();xPub();
+    const leader=XP(XG.leader);
+    // 1. Le chef propose une équipe
+    view(`<p class="eyebrow">Mission ${mi+1} · ${M.size} joueurs${M.fails>1?' · 2 sabotages pour échouer':''}</p><h2 class="h">Chef : ${esc(leader.name)}</h2>${miBoardHTML(miBoardData(),XG.players.map(p=>p.name))}`,
+      `<button class="btn" type="button" data-act="ok">${esc(leader.name)} compose son équipe</button>`);
+    await ask();
+    let team=await xTask({t:'pick',eyebrow:`Mission ${mi+1} · chef : ${leader.name}`,title:`Choisis ${M.size} joueurs`,note:'Tu peux te choisir toi-même. Tout le monde voit ton choix.',ids:XG.players.map(p=>p.id),n:M.size,confirm:'Proposer cette équipe'});
+    if(!Array.isArray(team))team=[team];
+    XG.team=team.slice().sort((a,b)=>a-b);xPub();
+    // 2. Tout le monde vote pour ou contre l'équipe
+    const teamTxt=joinFr(XG.team.map(i=>XP(i).name));
+    let yes=[],no=[],accepted;
+    if(XS.mi.mode==='phones'){
+      const votes=await xCollect(XG.players,()=>({t:'choice',eyebrow:`Mission ${mi+1} · équipe proposée`,title:teamTxt,note:'Acceptes-tu cette équipe ? Les votes seront révélés en même temps.',opts:[['yes','Pour',''],['no','Contre','wolf']]}),`Vote sur l'équipe`);
+      yes=XG.players.filter(p=>votes[p.id]==='yes').map(p=>p.id);no=XG.players.filter(p=>votes[p.id]==='no').map(p=>p.id);
+      accepted=yes.length>no.length;
+      view(`<p class="eyebrow">Vote sur l'équipe</p><h2 class="h">${accepted?'Équipe acceptée':'Équipe refusée'}</h2><p class="note">${teamTxt}</p>
+        <ul class="roster">${XG.players.map(p=>`<li><span class="nm">${esc(p.name)}</span><span class="pill ${votes[p.id]==='yes'?'':'wolf'}">${votes[p.id]==='yes'?'Pour':votes[p.id]==='no'?'Contre':'—'}</span></li>`).join('')}</ul>`,
+        `<button class="btn" type="button" data-act="ok">Continuer</button>`);
+      chime(accepted?'day':'night');
+      await ask();
+    } else {
+      const v=await xTask({t:'choice',eyebrow:`Mission ${mi+1} · vote sur l'équipe`,title:teamTxt,note:'Comptez jusqu\'à trois et votez tous en même temps, pouce levé ou baissé. Il faut une majorité de « pour ».',opts:[['yes','Équipe acceptée',''],['no','Équipe refusée','wolf']]});
+      accepted=v==='yes';yes=null;no=null;
+    }
+    if(!accepted){
+      XG.rejects++;
+      XG.hist.push({m:mi,leader:XG.leader,team:XG.team,yes,no,ok:null});
+      xLog(`Mission ${mi+1} : l'équipe de ${leader.name} (${teamTxt}) est refusée.`);
+      XG.leader=(XG.leader+1)%n;
+      if(XG.rejects>=5){
+        view(`<p class="eyebrow wolf">Cinq refus d'affilée</p><h2 class="h">La résistance s'est déchirée.</h2><p class="note">Les traîtres gagnent.</p>`,`<button class="btn" type="button" data-act="ok">Voir les rôles</button>`);
+        await ask();return {w:'traitres',how:'rejects'};
+      }
+      continue;
+    }
+    XG.rejects=0;
+    xLog(`Mission ${mi+1} : l'équipe de ${leader.name} (${teamTxt}) part en mission.`);
+    // 3. La mission, en secret
+    XG.phase='mission';setXBar();xPub();
+    const members=XG.team.map(XP);
+    const cards=await xCollect(members,p=>miIsTraitor(p)
+      ?{t:'choice',eyebrow:`Mission ${mi+1}`,title:'Ta carte de mission',note:'Tu es un traître : tu peux saboter, ou jouer la réussite pour ne pas te dévoiler.',opts:[['ok','Réussite',''],['ko','Sabotage','wolf']]}
+      :{t:'choice',eyebrow:`Mission ${mi+1}`,title:'Ta carte de mission',note:'Tu es résistant : tu joues forcément la réussite.',opts:[['ok','Réussite','']]},`Mission ${mi+1}`);
+    const played=shuffle(members.map(p=>cards[p.id]==='ko'&&miIsTraitor(p)?'ko':'ok'));
+    const sab=played.filter(c=>c==='ko').length,ok=sab<M.fails;
+    await miReveal(mi,played,ok);
+    M.result=ok?'ok':'ko';M.sab=sab;M.team=XG.team;
+    XG.hist.push({m:mi,leader:XG.leader,team:XG.team,yes,no,ok});
+    xLog(`Mission ${mi+1} : ${ok?'réussie':'sabotée'} (${sab} sabotage${sab>1?'s':''}).`);
+    XG.leader=(XG.leader+1)%n;XG.round++;
+    const wins=XG.missions.filter(m=>m.result==='ok').length,losses=XG.missions.filter(m=>m.result==='ko').length;
+    if(losses>=3)return {w:'traitres',how:'missions'};
+    if(wins>=3){
+      const as=XG.players.find(p=>p.role==='assassin');
+      if(!as)return {w:'resistance',how:'missions'};
+      return await miAssassin(as);
+    }
+  }
+}
+async function miReveal(mi,played,ok){
+  XG.phase='reveal';setXBar();xPub();
+  const cardHTML=(c,i)=>`<div class="flip mflip" id="mf${i}"><div class="flip-inner"><div class="flip-face flip-back"><div class="card back mcard"><h3 class="card-name">?</h3></div></div>
+    <div class="flip-face flip-front"><div class="card mcard ${c==='ko'?'wolf':''}"><div class="glyph">${icon(c==='ko'?'fangs':'shield',2.2)}</div><b>${c==='ko'?'Sabotage':'Réussite'}</b></div></div></div></div>`;
+  view(`<p class="eyebrow">Mission ${mi+1} · dépouillement</p><h2 class="h" id="mh">Les cartes sont mélangées…</h2><div class="mcards">${played.map(cardHTML).join('')}</div>`);
+  await wait(900);
+  for(let i=0;i<played.length;i++){
+    if(i===played.length-1){drumRoll(1.4);await wait(1500);}
+    const f=$('#mf'+i);if(f)f.classList.add('on');
+    if(played[i]==='ko')revealSting('loups');else tickSfx();
+    await wait(800);
+  }
+  const h=$('#mh');if(h)h.textContent=ok?'Mission réussie !':'Mission sabotée !';
+  if(ok)chime('day');
+  view($('#main .body').innerHTML+`<p class="result ${ok?'no':'yes'}">${ok?'La résistance avance.':'Les traîtres frappent.'}</p>`,`<button class="btn" type="button" data-act="ok">Continuer</button>`);
+  await ask();
+}
+async function miAssassin(as){
+  XG.phase='assassin';setXBar();xPub();
+  const traitors=XG.players.filter(miIsTraitor);
+  view(`<p class="eyebrow">Trois missions réussies</p><h2 class="h">Dernière chance des traîtres</h2><p class="note">Les traîtres se dévoilent : ${esc(joinFr(traitors.map(p=>p.name)))}. Ils se concertent à voix haute, puis l'assassin, ${esc(as.name)}, désigne celui qu'il croit être Merlin.</p>`,
+    `<button class="btn" type="button" data-act="ok">${esc(as.name)} désigne Merlin</button>`);
+  await ask();
+  const id=await xTask({t:'pick',eyebrow:'L\'assassin',title:`${as.name}, qui est Merlin ?`,ids:XG.players.filter(p=>!miIsTraitor(p)).map(p=>p.id),confirm:'Assassiner',tone:'wolf'});
+  const hit=XP(id).role==='merlin';
+  xLog(`L'assassin (${as.name}) désigne ${XP(id).name} : ${hit?'c\'était Merlin':'raté'}.`);
+  view(`<p class="eyebrow wolf">L'assassin frappe</p><p class="bigname">${esc(XP(id).name)}</p><p class="result ${hit?'yes':'no'}">${hit?'C\'était Merlin ! Les traîtres l\'emportent.':'Raté ! Merlin était '+esc(XG.players.find(p=>p.role==='merlin').name)+'.'}</p>`,`<button class="btn" type="button" data-act="ok">Voir les rôles</button>`);
+  await ask();
+  return hit?{w:'traitres',how:'assassin'}:{w:'resistance',how:'missions'};
+}
+async function miFinish(r){
+  XG.phase='end';setXBar();xPub();
+  for(const p of XG.players)cancelTasks(p.id);
+  window.scrollTo(0,0);
+  const res=XG.players.map(p=>{const t=miIsTraitor(p);const won=r.w==='traitres'?t:!t;return {name:p.name,role:p.role,won,pts:won?(t?2:1):0};});
+  recordGame('mi',res);clearXSave();
+  const head=r.w==='traitres'?'Les traîtres ont gagné':'La résistance a gagné';
+  const sub={rejects:'Cinq équipes refusées de suite.',missions:r.w==='traitres'?'Trois missions sabotées.':'Trois missions réussies.',assassin:"L'assassin a démasqué Merlin."}[r.how]||'';
+  view(`<p class="eyebrow">Fin de partie</p><h2 class="h">${head}</h2><p class="note">${sub}</p>
+    ${miBoardHTML(miBoardData(),XG.players.map(p=>p.name))}
+    <ul class="roster">${XG.players.map((p,i)=>`<li><span class="nm">${esc(p.name)}</span><span class="pill ${miIsTraitor(p)?'wolf':''}">${MI_ROLES[p.role].name}</span>${res[i].pts?`<span class="pts">+${res[i].pts}</span>`:''}</li>`).join('')}</ul>`,
+    xEndButtons('Rejouer'));
+  return await ask();
+}
+
+/* ---------- Règles ---------- */
+function xRulesHTML(k){
+  if(k==='sp')return `<h2 class="h">L'Espion · règles</h2><ul class="rules">
+    <li>Tous les joueurs reçoivent le même <b>lieu secret</b> et un rôle sur place, sauf <b>l'espion</b>, qui voit seulement la liste des lieux possibles.</li>
+    <li>Le premier joueur désigné pose une question à un autre, qui répond puis interroge quelqu'un d'autre (pas celui qui vient de l'interroger). Les questions doivent montrer qu'on connaît le lieu sans le révéler.</li>
+    <li><b>Accusation</b> : à tout moment, un joueur peut accuser quelqu'un, une fois par manche. Si tous les autres sont d'accord, on retourne la carte. Un innocent accusé fait gagner l'espion.</li>
+    <li><b>L'espion se dévoile</b> : à tout moment, il peut annoncer qu'il est l'espion et deviner le lieu. Juste, il gagne ; faux, il perd.</li>
+    <li><b>Fin du temps</b> : on désigne l'espion ensemble. Sans majorité, il s'échappe et gagne. Démasqué, il a encore une chance de gagner en devinant le lieu.</li>
+    <li>Points : 1 par agent gagnant (2 pour celui qui a lancé la bonne accusation), 2 pour l'espion gagnant, 3 s'il a deviné le lieu.</li></ul>`;
+  return `<h2 class="h">Les Missions · règles</h2><ul class="rules">
+    <li>Environ un tiers des joueurs sont des <b>traîtres</b>. Ils se connaissent ; les <b>résistants</b> ne savent rien.</li>
+    <li>À chaque tour, le <b>chef</b> propose une équipe de la taille indiquée. Tout le monde vote pour ou contre. Majorité de « pour » : l'équipe part. Sinon, le chef suivant propose. <b>Cinq refus d'affilée</b> : les traîtres gagnent.</li>
+    <li>En mission, chaque membre joue en secret <b>Réussite</b> ou <b>Sabotage</b> (les résistants jouent forcément Réussite). Un seul sabotage fait échouer la mission (deux pour la 4e mission à partir de 7 joueurs).</li>
+    <li>Trois missions réussies : la résistance gagne. Trois missions sabotées : les traîtres gagnent.</li>
+    ${Object.entries(MI_ROLES).map(([,r])=>`<li><b>${r.name}</b> · ${r.desc}</li>`).join('')}
+    <li>Points : 1 par résistant gagnant, 2 par traître gagnant.</li></ul>`;
+}
+
+/* ---------- Téléphone d'un joueur ---------- */
+function xClientIdle(pub,st,myName,names){
+  const k=pub.game;
+  let body=`<p class="eyebrow">${esc(myName)}</p>`;
+  if(!st){
+    body+=`<h2 class="h">${pub.gid?'Partie en cours.':'Tu es prêt.'}</h2><p class="note">${pub.gid?'Ton téléphone attend ta carte…':'La partie commencera depuis le téléphone central. Garde cette page ouverte.'}</p>`;
+  } else {
+    const sent=st.task&&CL.sent[st.task.id];
+    const ph={talk:'Questions en cours.',accuse:'Accusation en cours…',vote:'Vote en cours…',guess:"L'espion devine…",reveal:'Révélation…',team:'Le chef compose son équipe.',mission:'Mission en cours…',assassin:"L'assassin cherche Merlin…",end:'Partie terminée.'}[pub.phase]||'Partie en cours.';
+    body+=`<h2 class="h">${sent?'Choix envoyé.':ph}</h2>`;
+    if(k==='sp'&&typeof pub.left==='number'&&pub.phase==='talk')body+=`<div class="clock small">${Math.floor(pub.left/60)}:${String(Math.max(0,pub.left)%60).padStart(2,'0')}</div>`;
+    if(CL.showCard)body+=xCardHTML(st.card);
+    if(k==='sp'&&st.card&&st.card.spy&&!pub.final&&!['guess','reveal'].includes(pub.phase))body+=`<button class="btn wolf" type="button" data-act="spyout">Je me dévoile et je devine le lieu</button>`;
+  }
+  if(k==='mi'&&pub.board){
+    const b=pub.board;
+    if(pub.phase==='team'||pub.phase==='mission')body+=`<p class="note">Chef : <b>${esc(names[b.leader]||'?')}</b>${b.team&&b.team.length?` · équipe : ${esc(b.team.map(i=>names[i]).join(', '))}`:''}</p>`;
+    body+=miBoardHTML(b,names);
+  }
+  if(pub.final){
+    if(k==='sp')body+=`<div class="words"><div><span class="eyebrow">Le lieu</span><b>${esc(pub.final.loc)}</b></div><div><span class="eyebrow">L'espion</span><b>${esc(names[pub.final.spy]||'?')}</b></div></div>`;
+    if(k==='mi'&&Array.isArray(pub.final))body+=`<ul class="roster">${names.map((n,i)=>{const r=MI_ROLES[pub.final[i]]||MI_ROLES.resistant;return `<li><span class="nm">${esc(n)}</span><span class="pill ${r.team==='traitre'?'wolf':''}">${r.name}</span></li>`;}).join('')}</ul>`;
+  } else {
+    const log=Array.isArray(pub.log)?pub.log:[];
+    if(log.length&&k==='sp')body+=`<p class="eyebrow">Dans la partie</p>${log.slice().reverse().map(x=>`<p class="note">${esc(x)}</p>`).join('')}`;
+  }
+  const actions=st&&!pub.final?`<button class="btn ${CL.showCard?'ghost':''}" type="button" data-act="card">${CL.showCard?'Cacher ma carte':'Voir ma carte'}</button>`:'';
+  clientShow('xidle:'+body+actions,body,actions,()=>{$('#main').onclick=e=>{
+    if(e.target.closest('[data-act=card]')){CL.showCard=!CL.showCard;renderClient();}
+    const so=e.target.closest('[data-act=spyout]');
+    if(so){if(so.dataset.sure){sendSpecial('spy');so.disabled=true;so.textContent='Demande envoyée';}else{so.dataset.sure='1';so.textContent='Confirmer : je suis l\'espion';}}
+  };});
+}
 /* ================= Scores de la soirée et statistiques ================= */
 const SCORES_KEY='veillee-scores',STATS_KEY='veillee-stats';
 function loadScores(){
@@ -5718,11 +6481,11 @@ function scoreboardHTML(){
   return `<section class="section scoreboard"><h2>Classement de la soirée <span class="count">${sc.games} partie${sc.games>1?'s':''}</span></h2>
     <ol class="ranks">${list.slice(0,12).map(([n,p],i)=>`<li><span class="rk">${i+1}</span><span class="nm">${esc(n)}</span><span class="note">${p.wins} victoire${p.wins>1?'s':''} sur ${p.games}</span><span class="pts big">${p.pts} pt${p.pts>1?'s':''}</span></li>`).join('')}</ol>
     <div class="row"><button class="btn ghost small" type="button" data-act="stats">Statistiques</button><button class="btn ghost small" type="button" data-act="resetscores">Nouvelle soirée</button></div>
-    <p class="note">Une victoire rapporte 1 point (2 pour les amoureux et les undercovers, 3 pour un solitaire ou Mr White qui devine le mot).</p></section>`;
+    <p class="note">Une victoire rapporte 1 point (2 pour les amoureux, les undercovers, l'espion et les traîtres ; 3 pour un solitaire, ou Mr White et l'espion qui devinent).</p></section>`;
 }
 function statsHTML(){
   const st=store.get(STATS_KEY,{}),list=Object.entries(st).sort((a,b)=>b[1].games-a[1].games);
-  const roleName=k=>ROLES[k]?ROLES[k].name:UC_ROLES[k]?UC_ROLES[k].name:k;
+  const roleName=k=>ROLES[k]?ROLES[k].name:UC_ROLES[k]?UC_ROLES[k].name:MI_ROLES[k]?MI_ROLES[k].name:k==='espion'?'Espion':k==='agent'?'Agent':k;
   return `<p class="eyebrow">Statistiques</p><h2 class="h">Depuis le début</h2>
     ${list.length?`<ul class="roster">${list.map(([n,s])=>{const fav=Object.entries(s.roles||{}).sort((a,b)=>b[1]-a[1])[0];
       return `<li><span class="nm">${esc(n)}</span><span class="note">${s.games} partie${s.games>1?'s':''} · ${Math.round(100*s.wins/Math.max(1,s.games))} % de victoires${fav?` · souvent ${esc(roleName(fav[0]))}`:''}</span></li>`;}).join('')}</ul>`:'<p class="note">Aucune partie terminée pour l\'instant.</p>'}
@@ -5770,7 +6533,7 @@ const liliSVG=uid=>{
 };
 // Qui a proposé chaque jeu : un portrait dessiné et un prénom (d'autres copains viendront avec leurs jeux)
 const AUTHORS={lili:{name:'Lili',face:liliSVG}};
-const GAME_BY={lg:'lili',uc:'lili'};
+const GAME_BY={lg:'lili',uc:'lili',sp:'lili',mi:'lili'};
 const authorHTML=g=>{const a=AUTHORS[GAME_BY[g]];return a?`<span class="author">${a.face(g)}<span>Jeu proposé par <b>${esc(a.name)}</b></span></span>`:'';};
 function goLG(){
   renderSetup();
@@ -5786,20 +6549,24 @@ function renderHome(){
   if(NET.on)netStop();
   document.documentElement.dataset.phase='night';
   $('#bar').hidden=true;$('#bar').dataset.h='';$('#narr').hidden=true;
-  const lgs=loadLGSave(),ucs=loadUCSave();
+  const lgs=loadLGSave(),ucs=loadUCSave(),xs=loadXSave();
   const resume=lgs?`<div class="resume"><div><p class="eyebrow">Partie interrompue</p><b>Loups-garous · ${lgs.stage==='day'?'jour':'nuit'} ${lgs.stage==='day'?lgs.G.night:lgs.G.night+1}</b></div><div class="row"><button class="btn small" type="button" data-act="resumelg">Reprendre</button><button class="btn small ghost" type="button" data-act="droplg">Abandonner</button></div></div>`
-    :ucs?`<div class="resume"><div><p class="eyebrow">Partie interrompue</p><b>Undercover · tour ${ucs.UC.round+1}</b></div><div class="row"><button class="btn small" type="button" data-act="resumeuc">Reprendre</button><button class="btn small ghost" type="button" data-act="dropuc">Abandonner</button></div></div>`:'';
+    :ucs?`<div class="resume"><div><p class="eyebrow">Partie interrompue</p><b>Undercover · tour ${ucs.UC.round+1}</b></div><div class="row"><button class="btn small" type="button" data-act="resumeuc">Reprendre</button><button class="btn small ghost" type="button" data-act="dropuc">Abandonner</button></div></div>`
+    :xs?`<div class="resume"><div><p class="eyebrow">Partie interrompue</p><b>${XDEF[xs.XG.kind].title}</b></div><div class="row"><button class="btn small" type="button" data-act="resumex">Reprendre</button><button class="btn small ghost" type="button" data-act="dropx">Abandonner</button></div></div>`:'';
   view(`<header class="hero">${moonSVG(1,80)}<h1 class="title">Veillée de jeux</h1><p class="note">Choisissez un jeu. Le téléphone mène la partie autour de la table.</p></header>
     ${resume}
     <div class="games">
       <button class="gametile" type="button" data-act="lg"><span class="emblem wolf">${icon('wolf',2.2)}</span><span class="gt"><b>Loups-garous</b><span>Le village s'endort, les loups rôdent. Un maître du jeu qui parle à voix haute, 29 rôles et 4 univers : classique, vampires, open space, Poudlard.</span><span class="meta2">4 à 24 joueurs</span>${authorHTML('lg')}</span></button>
       <button class="gametile" type="button" data-act="uc"><span class="emblem mask">${icon('mask',2.2)}</span><span class="gt"><b>Undercover</b><span>Un mot commun, des undercovers et un Mr White. Démasquez-les sans trahir votre mot.</span><span class="meta2">3 à 20 joueurs</span>${authorHTML('uc')}</span></button>
+      <button class="gametile" type="button" data-act="sp"><span class="emblem mask">${icon('eye',2.2)}</span><span class="gt"><b>L'Espion</b><span>Tout le monde connaît le lieu secret, sauf l'espion. Questionnez-vous pour le démasquer… sans trop en dire.</span><span class="meta2">3 à 12 joueurs · 10 min</span>${authorHTML('sp')}</span></button>
+      <button class="gametile" type="button" data-act="mi"><span class="emblem wolf">${icon('shield',2.2)}</span><span class="gt"><b>Les Missions</b><span>Des traîtres sabotent en secret les missions de la résistance. Personne n'est éliminé : tout le monde joue jusqu'au bout.</span><span class="meta2">5 à 10 joueurs · 30 min</span>${authorHTML('mi')}</span></button>
     </div>
     ${NET.room&&subtle?`<button class="btn ghost" type="button" data-act="asplayer">Je suis joueur · rejoindre une partie</button>`:''}
     ${scoreboardHTML()}`);
   $('#main').onclick=e=>{
     const a=e.target.closest('[data-act]')?.dataset.act;
-    if(a==='lg')goLG();else if(a==='uc')goUC();else if(a==='asplayer')clientMode();
+    if(a==='lg')goLG();else if(a==='uc')goUC();else if(a==='sp'||a==='mi')xGo(a);else if(a==='asplayer')clientMode();
+    else if(a==='resumex')resumeX();else if(a==='dropx'){clearXSave();renderHome();}
     else if(a==='resumelg')resumeLG();else if(a==='resumeuc')resumeUC();
     else if(a==='droplg'){clearLGSave();renderHome();}else if(a==='dropuc'){clearUCSave();renderHome();}
     else if(a==='stats'){const s=$('#sheet'),p=$('#sheetPanel');s.hidden=false;p.innerHTML=statsHTML()+`<button class="btn" type="button" data-u="close">Fermer</button>`;}
@@ -5817,7 +6584,7 @@ requestAnimationFrame(()=>requestAnimationFrame(()=>document.documentElement.cla
   if(!room||!subtle)return;
   room.onPeers(()=>{if(CL.on&&!CL.gr)renderClient();});
   // Version autonome : un lien « …#lg-k7pm » ouvre directement l'écran du joueur
-  const m=window.STANDALONE&&location.hash.match(/^#(lg|uc)-([a-z0-9]{4,8})$/i);
+  const m=window.STANDALONE&&location.hash.match(/^#(lg|uc|sp|mi)-([a-z0-9]{4,8})$/i);
   if(m){clientMode();clientJoin(m[1].toLowerCase()+'-'+m[2].toLowerCase());return;}
   if(!NET.canEdit){clientMode();return;}
   if(APP==='home')renderHome();
