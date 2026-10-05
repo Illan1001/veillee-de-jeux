@@ -6,7 +6,7 @@
 <meta name="theme-color" content="#11152b">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="description" content="Loups-garous et Undercover : un téléphone maître du jeu, et un téléphone par joueur si vous voulez.">
-<title>Veillée de jeux</title>
+<title>Jeux entre copains</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Alegreya+Sans:wght@400;500;700;800&family=IM+Fell+English+SC&family=Grenze+Gotisch:wght@500;700&family=Space+Grotesk:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;700&family=Cinzel:wght@500;700&display=swap">
@@ -6575,7 +6575,7 @@ function renderHome(){
   const resume=lgs?`<div class="resume"><div><p class="eyebrow">Partie interrompue</p><b>Loups-garous · ${lgs.stage==='day'?'jour':'nuit'} ${lgs.stage==='day'?lgs.G.night:lgs.G.night+1}</b></div><div class="row"><button class="btn small" type="button" data-act="resumelg">Reprendre</button><button class="btn small ghost" type="button" data-act="droplg">Abandonner</button></div></div>`
     :ucs?`<div class="resume"><div><p class="eyebrow">Partie interrompue</p><b>Undercover · tour ${ucs.UC.round+1}</b></div><div class="row"><button class="btn small" type="button" data-act="resumeuc">Reprendre</button><button class="btn small ghost" type="button" data-act="dropuc">Abandonner</button></div></div>`
     :xs?`<div class="resume"><div><p class="eyebrow">Partie interrompue</p><b>${XDEF[xs.XG.kind].title}</b></div><div class="row"><button class="btn small" type="button" data-act="resumex">Reprendre</button><button class="btn small ghost" type="button" data-act="dropx">Abandonner</button></div></div>`:'';
-  view(`<header class="hero">${moonSVG(1,80)}<h1 class="title">Veillée de jeux</h1><p class="note">Choisissez un jeu. Le téléphone mène la partie autour de la table.</p></header>
+  view(`<header class="hero">${moonSVG(1,80)}<h1 class="title">Jeux entre copains</h1></header>
     ${resume}
     <div class="games">
       <button class="gametile" type="button" data-act="lg"><span class="emblem wolf">${icon('wolf',2.2)}</span><span class="gt"><b>Loups-garous</b><span>Le village s'endort, les loups rôdent. Un maître du jeu qui parle à voix haute, 29 rôles et 4 univers : classique, vampires, open space, Poudlard.</span><span class="meta2">4 à 24 joueurs</span>${authorHTML('lg')}</span></button>
