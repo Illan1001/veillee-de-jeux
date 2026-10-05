@@ -2924,7 +2924,7 @@ const setup={
   names:Array.isArray(saved.names)?saved.names:[],
   count:Math.max(4,saved.count||8),
   comp:saved.comp||null, custom:!!saved.custom, preset:saved.preset||null,
-  settings:Object.assign({voice:true,debate:180,lovers:'numeros',phones:false,maire:false,spectators:false,pace:'normal',voiceRate:1,ambient:true,wakeMin:15,theme:'classique'},saved.settings||{}),
+  settings:Object.assign({voice:true,debate:180,lovers:'numeros',phones:false,maire:false,spectators:false,pace:'normal',voiceRate:1,ambient:true,wakeMin:15,theme:'classique',vote:'auto'},saved.settings||{}),
   renames:saved.renames&&typeof saved.renames==='object'?saved.renames:{},
   modes:Array.isArray(saved.modes)?saved.modes:[]
 };
@@ -4586,7 +4586,7 @@ async function electMayor(){
   const voters=alive();
   await say('maire_election');
   let id=null;
-  if(NET.on&&voters.some(remoteOK)){
+  if(secretVotes(voters)){
     const r=await secretVote(voters,aliveIds(),{eyebrow:'Élection du maire',voterTitle:'Qui élis-tu maire ?',note:'Sa voix comptera double et il tranchera les égalités.',allowSelf:true,tone:''});
     id=r.id!=null?r.id:r.tie?r.tie[Math.floor(Math.random()*r.tie.length)]:null;
   } else {
@@ -4600,6 +4600,9 @@ async function electMayor(){
   await say('maire_elu');
   await pw(1000);
 }
+// Vote secret : forcé par le réglage « Toujours secret », ou automatique dès qu'un votant a son téléphone.
+// Les votants sans téléphone votent alors à tour de rôle sur le téléphone central.
+const secretVotes=voters=>setup.settings.vote==='secret'||(NET.on&&voters.some(remoteOK));
 // Un vote du village : renvoie {id,how} ou null
 async function villageVote(second){
   const voters=alive().filter(x=>!(x.role==='idiot'&&x.revealed));
@@ -4612,7 +4615,7 @@ async function villageVote(second){
   const eyebrow=`Jour ${G.night} · ${second?'second vote':'vote'}`;
   await explain('vote');
   let r;
-  if(NET.on&&voters.some(remoteOK)){
+  if(secretVotes(voters)){
     const pr=secretVote(voters,aliveIds(),{eyebrow,voterTitle:'Contre qui votes-tu ?',note:notes,mayorDouble:true,corbeau:!second});
     await say(voters.every(remoteOK)?'vote_phone':'vote_secret');
     r=await pr;
@@ -4963,6 +4966,8 @@ function renderSetup(){
       ${sw('disc',setup.settings.disc,'Mode découverte','Pour une première partie : la voix explique chaque étape la première fois, et chaque carte donne un exemple concret.')}
       ${sw('maire',setup.settings.maire,'Élire un maire','Élu au premier jour, sa voix compte double et il tranche les égalités.')}
       ${sw('spect',setup.settings.spectators,'Les morts voient tous les rôles','Sur leur téléphone ou dans « Mes infos ». À éviter si les morts ont du mal à se taire.')}
+      <div class="field"><label>Votes du village<br><span class="count">${setup.settings.vote==='secret'?'Chacun vote en secret : sur son téléphone, ou à tour de rôle sur le téléphone central. Les voix sont dévoilées une à une.':'À main levée, et le téléphone central enregistre le résultat. En secret sur les téléphones si des joueurs ont le leur.'}</span></label>
+        <div class="seg"><button type="button" data-act="votemode" data-v="auto" aria-pressed="${setup.settings.vote!=='secret'}">Main levée</button><button type="button" data-act="votemode" data-v="secret" aria-pressed="${setup.settings.vote==='secret'}">Secret</button></div></div>
       <div class="field"><label>Réveil des amoureux<br><span class="count">${setup.settings.lovers==='numeros'?'Chacun reçoit un numéro secret, la voix appelle ceux des amoureux.':"Cupidon touche l'épaule des deux amoureux."}</span></label>
         <div class="seg"><button type="button" data-act="lov" data-v="numeros" aria-pressed="${setup.settings.lovers==='numeros'}">Numéros</button><button type="button" data-act="lov" data-v="epaule" aria-pressed="${setup.settings.lovers!=='numeros'}">Épaule</button></div></div>
     </section>
@@ -5000,6 +5005,7 @@ function renderSetup(){
     else if(a==='wake'){setup.settings.wakeMin=+b.dataset.v;}
     else if(a==='maire'){setup.settings.maire=!setup.settings.maire;}
     else if(a==='disc'){setup.settings.disc=!setup.settings.disc;}
+    else if(a==='votemode'){setup.settings.vote=b.dataset.v;}
     else if(a==='spect'){setup.settings.spectators=!setup.settings.spectators;}
     else if(a==='pace'){setup.settings.pace=b.dataset.v;}
     else if(a==='rate'){setup.settings.voiceRate=+b.dataset.v;}
