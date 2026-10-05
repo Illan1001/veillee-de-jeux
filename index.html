@@ -2950,7 +2950,8 @@ function effectiveNames(){
 // Préférences communes aux deux jeux
 const PREFS=Object.assign({bigText:false},store.get('veillee-prefs',{}));
 const savePrefs=()=>store.set('veillee-prefs',PREFS);
-const applyPrefs=()=>document.documentElement.classList.toggle('big',!!PREFS.bigText);
+// (l'option « Grand texte » a été retirée : on s'assure qu'un ancien réglage ne reste pas actif)
+const applyPrefs=()=>document.documentElement.classList.remove('big');
 applyPrefs();
 // Rythme : multiplie les pauses de la nuit
 const PACE={rapide:.6,normal:1,lent:1.5};
@@ -4789,7 +4790,6 @@ function openSheet(mode='menu',arg){
       <button class="btn ghost" type="button" data-s="role">Revoir mes infos</button>
       <button class="btn ghost" type="button" data-s="voice">${setup.settings.voice?'Couper la voix (un joueur lira)':'Réactiver la voix'}</button>
       <button class="btn ghost" type="button" data-s="amb">${setup.settings.ambient?"Couper l'ambiance de nuit":"Réactiver l'ambiance de nuit"}</button>
-      <button class="btn ghost" type="button" data-s="big">${PREFS.bigText?'Texte normal':'Grand texte'}</button>
       <button class="btn ghost" type="button" data-s="rules">Règles et rôles</button>
       <button class="btn ghost" type="button" data-s="stop">Arrêter la partie</button>
       <button class="btn" type="button" data-s="close">Fermer</button>`;
@@ -4822,7 +4822,6 @@ $('#sheet').addEventListener('click',e=>{
   if(a==='repeat'){$('#sheet').hidden=true;if(lastKeys.length){unlockAudio();playSeq(lastKeys);}}
   if(a==='voice'){setup.settings.voice=!setup.settings.voice;if(!setup.settings.voice)stopVoice();else unlockAudio();persist();openSheet();}
   if(a==='amb'){setup.settings.ambient=!setup.settings.ambient;persist();if(!setup.settings.ambient)stopAmbient();else if(G&&G.phase==='night')startAmbient();openSheet();}
-  if(a==='big'){PREFS.bigText=!PREFS.bigText;savePrefs();applyPrefs();openSheet();}
   if(a==='rules')openSheet('rules');
   if(a==='role')openSheet('role');
   if(a==='stop')openSheet('stop');
@@ -5797,16 +5796,12 @@ function renderHome(){
       <button class="gametile" type="button" data-act="uc"><span class="emblem mask">${icon('mask',2.2)}</span><span class="gt"><b>Undercover</b><span>Un mot commun, des undercovers et un Mr White. Démasquez-les sans trahir votre mot.</span><span class="meta2">3 à 20 joueurs</span>${authorHTML('uc')}</span></button>
     </div>
     ${NET.room&&subtle?`<button class="btn ghost" type="button" data-act="asplayer">Je suis joueur · rejoindre une partie</button>`:''}
-    ${scoreboardHTML()}
-    <section class="section"><h2>Affichage</h2>
-      <div class="field"><label>Grand texte<br><span class="count">Plus lisible quand le téléphone est posé au milieu de la table.</span></label><button class="switch" type="button" role="switch" aria-checked="${!!PREFS.bigText}" aria-label="Grand texte" data-act="big"></button></div>
-    </section>`);
+    ${scoreboardHTML()}`);
   $('#main').onclick=e=>{
     const a=e.target.closest('[data-act]')?.dataset.act;
     if(a==='lg')goLG();else if(a==='uc')goUC();else if(a==='asplayer')clientMode();
     else if(a==='resumelg')resumeLG();else if(a==='resumeuc')resumeUC();
     else if(a==='droplg'){clearLGSave();renderHome();}else if(a==='dropuc'){clearUCSave();renderHome();}
-    else if(a==='big'){PREFS.bigText=!PREFS.bigText;savePrefs();applyPrefs();renderHome();}
     else if(a==='stats'){const s=$('#sheet'),p=$('#sheetPanel');s.hidden=false;p.innerHTML=statsHTML()+`<button class="btn" type="button" data-u="close">Fermer</button>`;}
     else if(a==='resetscores'){store.set(SCORES_KEY,{t:Date.now(),players:{},games:0});renderHome();}
   };
