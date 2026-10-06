@@ -6588,7 +6588,7 @@ function renderHome(){
     ${scoreboardHTML()}`);
   $('#main').onclick=e=>{
     const a=e.target.closest('[data-act]')?.dataset.act;
-    if(a==='lg')goLG();else if(a==='uc')goUC();else if(a==='sp'||a==='mi')xGo(a);else if(a==='bn'){if(NET.on)netStop();location.href='bataille-navale.html';}else if(a==='asplayer')clientMode();
+    if(a==='lg')goLG();else if(a==='uc')goUC();else if(a==='sp'||a==='mi')xGo(a);else if(a==='bn'){if(NET.on)netStop();location.href='touche-coule.html';}else if(a==='asplayer')clientMode();
     else if(a==='resumex')resumeX();else if(a==='dropx'){clearXSave();renderHome();}
     else if(a==='resumelg')resumeLG();else if(a==='resumeuc')resumeUC();
     else if(a==='droplg'){clearLGSave();renderHome();}else if(a==='dropuc'){clearUCSave();renderHome();}
