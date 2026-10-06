@@ -421,6 +421,66 @@ html.big .btn{font-size:20px;min-height:62px}
 :root[data-gtheme="poudlard"] .h,:root[data-gtheme="poudlard"] .narr-text{font-weight:500}
 :root[data-gtheme="poudlard"] .narr-text{font-size:clamp(21px,5.8vw,27px);line-height:1.25}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+
+/* ---------- Démineur ---------- */
+.emblem.minee{color:#9fb3c8;background:color-mix(in srgb,#9fb3c8 16%,transparent)}
+.ms .hero{flex-direction:row;align-items:center;gap:14px}
+.msthemes{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:5px}
+.mst{display:flex;flex-direction:column;align-items:center;gap:5px;padding:9px 2px 8px;border-radius:12px;border:1.5px solid var(--line);background:transparent;cursor:pointer;font:600 12px/1.15 var(--body);letter-spacing:-.01em;hyphens:manual;color:var(--muted);min-width:0;text-align:center}
+.mst[aria-checked="true"]{border-color:var(--accent);color:var(--fg);background:color-mix(in srgb,var(--accent) 12%,transparent)}
+.msti{display:grid;place-items:center;width:34px;height:34px;border-radius:9px;background:#c0c0c0}
+.msti svg{width:26px;height:26px}
+.mst.t-politique .msti{background:#fde4dd}.mst.t-port .msti{background:#9fd4ea}.mst.t-chocolatine .msti{background:#fbf1de}.mst.t-these .msti{background:#f4efe1}
+.msrow{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.msrow .seg button{padding:10px 11px}
+.msframe{--frame:#c0c0c0;--hi:#fff;--lo:#808080;--cover:#c0c0c0;--open:#c0c0c0;--grid:#808080;--ledbg:#000;--ledfg:#ff1a0a;
+  --n1:#0000ff;--n2:#008000;--n3:#ff0000;--n4:#000080;--n5:#800000;--n6:#008080;--n7:#000;--n8:#808080;
+  align-self:center;max-width:100%;background:var(--frame);padding:7px;border:3px solid;border-color:var(--hi) var(--lo) var(--lo) var(--hi);display:flex;flex-direction:column;gap:7px;color:#000}
+.mshead{display:flex;align-items:center;justify-content:space-between;padding:5px 6px;border:2px solid;border-color:var(--lo) var(--hi) var(--hi) var(--lo)}
+.led{min-width:3.3ch;padding:1px 4px;background:var(--ledbg);color:var(--ledfg);font:700 26px/1.05 "Courier New",ui-monospace,monospace;letter-spacing:.04em;text-align:center;font-variant-numeric:tabular-nums;border:1px solid;border-color:var(--lo) var(--hi) var(--hi) var(--lo)}
+.msface{width:40px;height:40px;padding:3px;background:var(--cover);border:3px solid;border-color:var(--hi) var(--lo) var(--lo) var(--hi);cursor:pointer;display:grid;place-items:center}
+.msface:active{border-color:var(--lo) var(--hi) var(--hi) var(--lo)}
+.msface svg{width:28px;height:28px}
+.msscroll{max-width:100%;overflow-x:auto;border:3px solid;border-color:var(--lo) var(--hi) var(--hi) var(--lo)}
+.msboard{display:grid;grid-template-columns:repeat(var(--cols),var(--cs));grid-auto-rows:var(--cs);width:max-content;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;touch-action:manipulation}
+.msc{all:unset;box-sizing:border-box;width:var(--cs);height:var(--cs);display:grid;place-items:center;position:relative;cursor:pointer;
+  font:900 calc(var(--cs) * .6)/1 "Arial Black","Arial",system-ui,sans-serif;-webkit-touch-callout:none}
+.msc:focus-visible{outline:2px solid #ffbf00;outline-offset:-2px;z-index:1}
+.msc svg{width:76%;height:76%;pointer-events:none}
+.msc.cov{background:var(--cover);border:calc(var(--cs) * .1) solid;border-color:var(--hi) var(--lo) var(--lo) var(--hi)}
+.msc.op,.msc.mine,.msc.wrong{background:var(--open);border-right:1px solid var(--grid);border-bottom:1px solid var(--grid)}
+.msc.op{cursor:default}
+.msc.boom{background:#ff0000}
+.msc.wrong i{position:absolute;inset:16%;background:linear-gradient(45deg,transparent 44%,#e00 44% 56%,transparent 56%),linear-gradient(-45deg,transparent 44%,#e00 44% 56%,transparent 56%)}
+.msc[data-n="1"]{color:var(--n1)}.msc[data-n="2"]{color:var(--n2)}.msc[data-n="3"]{color:var(--n3)}.msc[data-n="4"]{color:var(--n4)}
+.msc[data-n="5"]{color:var(--n5)}.msc[data-n="6"]{color:var(--n6)}.msc[data-n="7"]{color:var(--n7)}.msc[data-n="8"]{color:var(--n8)}
+/* politique : cases LFI à révéler, cases RN à éviter */
+.msframe.t-politique{--frame:#efe9f2;--hi:#fff;--lo:#a99bb5;--cover:#e3dcea;--open:#fde4dd;--grid:#efb7a8;--ledbg:#0d1b4c;--ledfg:#ff5a4f;
+  --n1:#c8102e;--n2:#7a2a8c;--n3:#d2541b;--n4:#4b1f6f;--n5:#8c1020;--n6:#a3366b;--n7:#3b0f1a;--n8:#6b5a74;border-radius:6px}
+.t-politique .msc.z::after{content:"LFI";font:900 calc(var(--cs) * .28)/1 "Arial Black",Arial,sans-serif;color:#c8102e;opacity:.55;letter-spacing:.02em}
+.t-politique .msc.boom{background:#c8102e}
+/* le port : mer profonde, eau libre, mines marines */
+.msframe.t-port{--frame:#1c3e66;--hi:#5f8fc4;--lo:#0b2240;--cover:#2f6aa8;--open:#bfe6f5;--grid:#86c3dc;--ledbg:#06162b;--ledfg:#5fe1ff;
+  --n1:#0b5fb3;--n2:#0f7a55;--n3:#d23a2a;--n4:#123a7a;--n5:#8a2b1a;--n6:#0a7a85;--n7:#13213d;--n8:#5a6b80;color:#fff;border-radius:8px}
+.t-port .msc.cov{background:linear-gradient(170deg,#3a7cc0,#245a96)}
+.t-port .msc.z::after{content:"";width:46%;height:22%;border-top:2px solid rgba(255,255,255,.75);border-radius:50% 50% 0 0}
+/* chocolatine : pâte feuilletée, assiette, pains au chocolat */
+.msframe.t-chocolatine{--frame:#8a5216;--hi:#f4cc85;--lo:#5c340c;--cover:#dfa04a;--open:#fbf1de;--grid:#e6cfa6;--ledbg:#2b1608;--ledfg:#ffb02e;
+  --n1:#6b3a12;--n2:#2f7a3a;--n3:#c0392b;--n4:#4a2512;--n5:#8a2b1a;--n6:#a0601a;--n7:#2b1608;--n8:#7d6a55;border-radius:8px}
+.t-chocolatine .msc.cov{background:repeating-linear-gradient(160deg,#e3a64f 0 4px,#d7953c 4px 6px)}
+.t-chocolatine .msc.z::after{content:"";width:58%;height:30%;border-radius:40%;background:linear-gradient(90deg,#4a2512 0 14%,#e0a24e 14% 86%,#4a2512 86%);opacity:.38}
+/* la thèse : feuilles, citations, Reviewer 2 */
+.msframe.t-these{--frame:#e9e2cf;--hi:#fffdf6;--lo:#b9ae92;--cover:#fffdf6;--open:#f4efe1;--grid:#ddd3ba;--ledbg:#1d2a44;--ledfg:#f7f3e6;
+  --n1:#2d4a8a;--n2:#2f6b3a;--n3:#c0261c;--n4:#1d2a44;--n5:#7a2a1a;--n6:#2a6b6b;--n7:#111;--n8:#7a7262;border-radius:4px}
+.t-these .msc.cov{background:repeating-linear-gradient(180deg,#fffdf6 0 5px,#dfe7f5 5px 6px)}
+.t-these .msc.op{font-family:Georgia,"Times New Roman",serif;font-weight:700}
+.t-these .msc.z::after{content:"\201D";font:700 calc(var(--cs) * .55)/1 Georgia,serif;color:#2d4a8a;opacity:.3;margin-top:28%}
+.t-these .msc.boom{background:#f6c9c2}
+.msmsg{display:flex;flex-direction:column;gap:4px;padding:12px 14px;border-radius:12px;border:1.5px solid var(--line)}
+.msmsg b{font-family:var(--display);font-size:26px;line-height:1.1}
+.msmsg span{color:var(--muted)}
+.msmsg.win{border-color:var(--village);background:color-mix(in srgb,var(--village) 12%,transparent)}
+.msmsg.lose{border-color:var(--wolf);background:color-mix(in srgb,var(--wolf) 12%,transparent)}
 </style><style>[hidden]{display:none!important}:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}img{max-width:100%}</style>
 </head>
 <body>
@@ -2936,6 +2996,7 @@ const ICONS={
   key:'<circle cx="15" cy="24" r="8"/><path d="M23 24h20M37 24v7M43 24v5"/>',
   medal:'<path d="M16 4l8 12 8-12"/><circle cx="24" cy="30" r="12"/><path d="M24 23l2 4 4.5.6-3.2 3 .8 4.4-4.1-2.2-4.1 2.2.8-4.4-3.2-3 4.5-.6z"/>',
   mask:'<path d="M5 15c6-4 12-5 19-5s13 1 19 5c0 11-6 18-12 18-3 0-5-3-7-3s-4 3-7 3C11 33 5 26 5 15z"/><path d="M13 20c2-2 6-2 8 0M27 20c2-2 6-2 8 0"/><path d="M18 40c4 2 8 2 12 0"/>',
+  mine:'<circle cx="24" cy="25" r="11"/><path d="M24 7v7M24 36v6M6 25h7M35 25h7M11.5 12.5l5 5M36.5 12.5l-5 5M11.5 37.5l5-5M36.5 37.5l-5-5"/><circle cx="20" cy="21" r="2.2"/>',
   anchor:'<circle cx="24" cy="9" r="4"/><path d="M24 13v29M15 20h18M8 27c0 9 7 15 16 15s16-6 16-15M8 27l-3 4M8 27l4 2M40 27l3 4M40 27l-4 2"/>',
   blank:'<rect x="10" y="5" width="28" height="38" rx="4"/><path d="M19 18a5 5 0 1 1 7 4.6c-1.4.7-2 1.6-2 3.4M24 32h.01"/>',
   menu:'<path d="M10 16h28M10 24h28M10 32h28"/>'
@@ -6455,6 +6516,267 @@ function xClientIdle(pub,st,myName,names){
     if(so){if(so.dataset.sure){sendSpecial('spy');so.disabled=true;so.textContent='Demande envoyée';}else{so.dataset.sure='1';so.textContent='Confirmer : je suis l\'espion';}}
   };});
 }
+
+/* ================= Démineur (jeu solo, proposé par Lili) =================
+   Cinq thèmes : classique (façon démineur d'antan), politique (LFI / RN), le port, chocolatine, la thèse.
+   Premier toucher toujours sûr (la case et ses voisines), ouverture en cascade des zones vides,
+   « accord » sur un chiffre dont toutes les mines voisines sont marquées, appui long ou mode drapeau pour marquer.
+   Meilleur temps gardé par thème et par niveau sur ce téléphone. */
+const MS_LEVELS=[{n:'Débutant',c:9,r:9,m:10},{n:'Intermédiaire',c:10,r:16,m:25},{n:'Expert',c:12,r:24,m:58}];
+const MS_THEMES={
+  classique:{name:'Classique',flag:'Drapeau',aFlag:'un drapeau',nbs:'mines voisines',flags:'drapeaux',mines:'mines',
+    help:"Révèle toutes les cases sans mine. Chaque chiffre indique combien de mines touchent la case.",
+    win:'Gagné !',winSub:'Toutes les mines sont déminées.',lose:'Boum !',loseSub:'Tu as marché sur une mine.'},
+  politique:{name:'Politique',flag:'Barrage',aFlag:'un barrage',nbs:'cases RN voisines',flags:'barrages',mines:'cases RN',
+    help:"Clique sur les cases LFI et évite les cases RN. Chaque chiffre indique combien de cases RN touchent la case. Pose un barrage sur celles que tu as repérées.",
+    win:'Front populaire !',winSub:'Toutes les cases RN ont été contenues.',lose:'Le RN passe au second tour…',loseSub:'Tu as cliqué sur une case RN.'},
+  port:{name:'Le port',flag:'Bouée',aFlag:'une bouée',nbs:'mines voisines',flags:'bouées',mines:'mines',
+    help:"Révèle la mer libre et évite les mines marines. Chaque chiffre indique combien de mines touchent la case. Pose une bouée sur celles que tu as repérées.",
+    win:'Chenal déminé !',winSub:'Le port est sûr, les navires peuvent entrer.',lose:'Boum !',loseSub:'Ton bateau a heurté une mine.'},
+  chocolatine:{name:'Chocolatine',flag:'Drapeau occitan',aFlag:'un drapeau occitan',nbs:'pains au chocolat voisins',flags:'drapeaux',mines:'pains au chocolat',
+    help:"Trouve les chocolatines et évite les pains au chocolat. Chaque chiffre indique combien de pains au chocolat touchent la case.",
+    win:'Le Sud-Ouest est fier de toi !',winSub:'Que des chocolatines, pas un seul pain au chocolat.',lose:'Hérésie !',loseSub:'Tu as dit « pain au chocolat ».'},
+  these:{name:'La thèse',flag:'Réponse',aFlag:'une réponse',nbs:'Reviewers 2 voisins',flags:'réponses',mines:'Reviewers 2',
+    help:"Récolte les citations et évite le Reviewer 2. Chaque chiffre indique combien de Reviewers 2 rôdent autour. Marque-les d'une réponse aux reviewers.",
+    win:'Accepté sans révision !',winSub:'Ton article passe du premier coup.',lose:'Rejet.',loseSub:'Reviewer 2 : « rejet sans possibilité de resoumission ».'}
+};
+const MS_KEY='veillee-ms',MS_BEST='veillee-ms-best';
+const MSP=Object.assign({theme:'classique',lvl:0},store.get(MS_KEY,{}));
+if(!MS_THEMES[MSP.theme])MSP.theme='classique';
+if(!MS_LEVELS[MSP.lvl])MSP.lvl=0;
+let MS=null,msTimer=null;
+
+/* ---------- dessins (repère 20 × 20) ---------- */
+function msMineSVG(t){
+  if(t==='politique')return `<svg viewBox="0 0 20 20" aria-hidden="true"><rect x="2" y="3.5" width="16" height="13" rx="3" fill="#0d1b4c"/><text x="10" y="13.4" text-anchor="middle" font-family="Arial Black,Arial,sans-serif" font-weight="900" font-size="8" fill="#fff">RN</text></svg>`;
+  if(t==='port')return `<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 15.5v3" stroke="#3b3f45" stroke-width="1.4"/><g stroke="#1d2126" stroke-width="2" stroke-linecap="round"><path d="M10 2.8v2.4M10 14.8v-1M3.2 9.5h2.2M16.8 9.5h-2.2M5.2 4.7l1.6 1.6M14.8 4.7l-1.6 1.6M5.2 14.3l1.6-1.6M14.8 14.3l-1.6-1.6"/></g><circle cx="10" cy="9.5" r="5" fill="#2a2f36"/><circle cx="8.3" cy="7.8" r="1.4" fill="#8c98a6"/></svg>`;
+  if(t==='chocolatine')return `<svg viewBox="0 0 20 20" aria-hidden="true"><rect x="2.5" y="5.5" width="15" height="9" rx="2.6" fill="#d9963f" stroke="#8a5216" stroke-width="1"/><path d="M5 7.5c3 .8 7 .8 10 0M5 10c3 .8 7 .8 10 0M5 12.5c3 .7 7 .7 10 0" stroke="#f2c27a" stroke-width=".9" fill="none"/><rect x="1.5" y="8" width="2.4" height="4" rx=".8" fill="#4a2512"/><rect x="16.1" y="8" width="2.4" height="4" rx=".8" fill="#4a2512"/></svg>`;
+  if(t==='these')return `<svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="7.6" fill="none" stroke="#c0261c" stroke-width="1.8"/><circle cx="10" cy="10" r="5.6" fill="#c0261c" fill-opacity=".1" stroke="#c0261c" stroke-width=".8"/><text x="10" y="13.1" text-anchor="middle" font-family="Georgia,serif" font-weight="700" font-size="7.6" fill="#c0261c">R2</text></svg>`;
+  return `<svg viewBox="0 0 20 20" aria-hidden="true"><g stroke="#000" stroke-width="1.8" stroke-linecap="round"><path d="M10 2v16M2 10h16M4.4 4.4l11.2 11.2M15.6 4.4L4.4 15.6"/></g><circle cx="10" cy="10" r="5.3" fill="#000"/><rect x="7" y="7" width="2.2" height="2.2" fill="#fff"/></svg>`;
+}
+function msFlagSVG(t){
+  if(t==='politique')return `<svg viewBox="0 0 20 20" aria-hidden="true"><rect x="3" y="8" width="1.8" height="9" fill="#555"/><rect x="15.2" y="8" width="1.8" height="9" fill="#555"/><rect x="1.5" y="6.5" width="17" height="4.4" rx="1" fill="#fff" stroke="#c8102e" stroke-width=".9"/><path d="M4 6.5l-2.5 4.4M8.5 6.5l-2.5 4.4M13 6.5l-2.5 4.4M17.5 6.5l-2.5 4.4" stroke="#c8102e" stroke-width="2.2"/></svg>`;
+  if(t==='port')return `<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 2.5v3" stroke="#333" stroke-width="1.2"/><path d="M5.5 15.5L7.6 5.5h4.8l2.1 10z" fill="#e23b2e" stroke="#7a1810" stroke-width=".8"/><path d="M6.8 9.4h6.4l.6 2.6H6.2z" fill="#fff"/><path d="M2.5 16.5c2-1.2 3.5 1.2 5.5 0s3.5 1.2 5.5 0 3.5 1.2 4.5 0" stroke="#fff" stroke-width="1.3" fill="none"/></svg>`;
+  if(t==='chocolatine')return `<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4.5 2.5v15" stroke="#4a2512" stroke-width="1.6" stroke-linecap="round"/><rect x="5.3" y="3" width="11.5" height="9" fill="#d5202a"/><g fill="#f6c21c"><rect x="10.4" y="4.2" width="1.3" height="6.6"/><rect x="7.7" y="6.85" width="6.7" height="1.3"/><circle cx="11.05" cy="4.3" r=".9"/><circle cx="11.05" cy="10.7" r=".9"/><circle cx="7.8" cy="7.5" r=".9"/><circle cx="14.3" cy="7.5" r=".9"/></g></svg>`;
+  if(t==='these')return `<svg viewBox="0 0 20 20" aria-hidden="true"><rect x="2.5" y="5" width="15" height="10.5" rx="1.2" fill="#fff" stroke="#2d4a8a" stroke-width="1.2"/><path d="M2.8 5.6l7.2 5.4 7.2-5.4" fill="none" stroke="#2d4a8a" stroke-width="1.2"/></svg>`;
+  return `<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10.5 3v11" stroke="#000" stroke-width="1.6"/><path d="M10.5 3L4 6.3l6.5 3.3z" fill="#f00"/><path d="M6.5 14.5h8M5 16.5h11" stroke="#000" stroke-width="1.8"/></svg>`;
+}
+function msFaceSVG(s){
+  const eyes=s==='win'?`<path d="M5.2 8.6h9.6" stroke="#000" stroke-width="1"/><rect x="5" y="7.6" width="4.2" height="2.6" rx=".8" fill="#000"/><rect x="10.8" y="7.6" width="4.2" height="2.6" rx=".8" fill="#000"/>`
+    :s==='lose'?`<path d="M6.2 7l2.2 2.2M8.4 7L6.2 9.2M11.6 7l2.2 2.2M13.8 7l-2.2 2.2" stroke="#000" stroke-width="1.1"/>`
+    :`<circle cx="7.4" cy="8.2" r="1.1" fill="#000"/><circle cx="12.6" cy="8.2" r="1.1" fill="#000"/>`;
+  const mouth=s==='press'?`<circle cx="10" cy="13.3" r="1.7" fill="none" stroke="#000" stroke-width="1.1"/>`
+    :s==='lose'?`<path d="M6.8 14.6q3.2-2.6 6.4 0" fill="none" stroke="#000" stroke-width="1.1"/>`
+    :`<path d="M6.6 12.2q3.4 3 6.8 0" fill="none" stroke="#000" stroke-width="1.1"/>`;
+  return `<svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="8.4" fill="#ffe000" stroke="#000" stroke-width="1"/>${eyes}${mouth}</svg>`;
+}
+
+/* ---------- logique ---------- */
+function msNew(){
+  const L=MS_LEVELS[MSP.lvl];
+  clearInterval(msTimer);msTimer=null;
+  MS={theme:MSP.theme,lvl:MSP.lvl,c:L.c,r:L.r,m:L.m,n:L.c*L.r,mine:null,adj:null,open:new Uint8Array(L.c*L.r),flag:new Uint8Array(L.c*L.r),
+    opened:0,flags:0,started:false,over:false,won:false,boom:-1,t0:0,elapsed:0,mode:MS?MS.mode:'dig',face:'idle',record:false};
+}
+function msNb(i){
+  const c=MS.c,r=MS.r,x=i%c,y=(i/c)|0,o=[];
+  for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++){
+    if(!dx&&!dy)continue;const xx=x+dx,yy=y+dy;
+    if(xx>=0&&xx<c&&yy>=0&&yy<r)o.push(yy*c+xx);
+  }
+  return o;
+}
+function msPlace(first){
+  const safe=new Set([first,...msNb(first)]);
+  let pool=[...Array(MS.n).keys()].filter(i=>!safe.has(i));
+  if(pool.length<MS.m)pool=[...Array(MS.n).keys()].filter(i=>i!==first);
+  for(let i=pool.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[pool[i],pool[j]]=[pool[j],pool[i]];}
+  MS.mine=new Uint8Array(MS.n);pool.slice(0,MS.m).forEach(i=>MS.mine[i]=1);
+  MS.adj=new Uint8Array(MS.n);
+  for(let i=0;i<MS.n;i++)MS.adj[i]=msNb(i).reduce((a,j)=>a+MS.mine[j],0);
+  MS.started=true;MS.t0=Date.now();
+  msTimer=setInterval(msTick,250);
+}
+function msTick(){
+  if(APP!=='ms'||!MS||!MS.started||MS.over){clearInterval(msTimer);msTimer=null;return;}
+  MS.elapsed=Date.now()-MS.t0;
+  const el=document.getElementById('msTime');if(el)el.textContent=msLed(Math.floor(MS.elapsed/1000));
+}
+const msLed=v=>{v=Math.max(-99,Math.min(999,v));return v<0?'-'+String(-v).padStart(2,'0'):String(v).padStart(3,'0');};
+function msReveal(i){
+  if(MS.over||MS.open[i]||MS.flag[i])return;
+  if(!MS.started)msPlace(i);
+  if(MS.mine[i]){msLose(i);return;}
+  const stack=[i];
+  while(stack.length){
+    const k=stack.pop();
+    if(MS.open[k]||MS.flag[k])continue;
+    MS.open[k]=1;MS.opened++;
+    if(MS.adj[k]===0)msNb(k).forEach(j=>{if(!MS.open[j]&&!MS.mine[j])stack.push(j);});
+  }
+  if(MS.opened===MS.n-MS.m)msWin();
+}
+function msChord(i){
+  if(MS.over||!MS.open[i]||!MS.adj[i])return false;
+  const nb=msNb(i),fl=nb.filter(j=>MS.flag[j]).length;
+  if(fl!==MS.adj[i])return false;
+  let any=false;
+  for(const j of nb){if(!MS.open[j]&&!MS.flag[j]){any=true;msReveal(j);if(MS.over)break;}}
+  return any;
+}
+function msToggleFlag(i){
+  if(MS.over||MS.open[i])return;
+  MS.flag[i]^=1;MS.flags+=MS.flag[i]?1:-1;
+  try{navigator.vibrate&&navigator.vibrate(18);}catch(e){}
+}
+function msStop(){MS.over=true;MS.elapsed=MS.started?Date.now()-MS.t0:0;clearInterval(msTimer);msTimer=null;}
+function msLose(i){
+  msStop();MS.boom=i;MS.face='lose';
+  try{navigator.vibrate&&navigator.vibrate([60,40,120]);}catch(e){}
+}
+function msWin(){
+  msStop();MS.won=true;MS.face='win';
+  for(let i=0;i<MS.n;i++)if(MS.mine[i]&&!MS.flag[i]){MS.flag[i]=1;MS.flags++;}
+  const best=store.get(MS_BEST,{}),k=MS.theme+'|'+MS.lvl,t=MS.elapsed;
+  if(!best[k]||t<best[k]){best[k]=t;store.set(MS_BEST,best);MS.record=true;}
+}
+const msSec=ms=>{const s=ms/1000;return s<60?`${s.toFixed(1).replace('.',',')} s`:`${Math.floor(s/60)} min ${String(Math.floor(s%60)).padStart(2,'0')} s`;};
+
+/* ---------- affichage ---------- */
+function msCellHTML(i){
+  const t=MS.theme,o=MS.open[i],f=MS.flag[i],x=i%MS.c+1,y=((i/MS.c)|0)+1;
+  if(MS.over&&MS.mine&&MS.mine[i]&&!f)return `<button class="msc mine${i===MS.boom?' boom':''}" type="button" data-i="${i}" aria-label="${MS_THEMES[t].mines}, colonne ${x} ligne ${y}">${msMineSVG(t)}</button>`;
+  if(MS.over&&!MS.won&&f&&MS.mine&&!MS.mine[i])return `<button class="msc wrong" type="button" data-i="${i}" aria-label="Erreur, colonne ${x} ligne ${y}">${msMineSVG(t)}<i></i></button>`;
+  if(f)return `<button class="msc cov" type="button" data-i="${i}" aria-label="${MS_THEMES[t].flag}, colonne ${x} ligne ${y}">${msFlagSVG(t)}</button>`;
+  if(!o)return `<button class="msc cov" type="button" data-i="${i}" aria-label="Case cachée, colonne ${x} ligne ${y}"></button>`;
+  const a=MS.adj[i];
+  return `<button class="msc op${a?'':' z'}" type="button" data-i="${i}" ${a?`data-n="${a}"`:''} aria-label="${a?a:'Vide'}, colonne ${x} ligne ${y}">${a||''}</button>`;
+}
+function msCellSize(){
+  const m=$('#main'),cs=m?getComputedStyle(m):null;
+  const w=Math.min(m?m.clientWidth-parseFloat(cs.paddingLeft)-parseFloat(cs.paddingRight):360,540,document.documentElement.clientWidth-32);
+  return Math.max(24,Math.min(42,Math.floor((w-26)/MS.c)));
+}
+function msBoardHTML(){
+  let h='';for(let i=0;i<MS.n;i++)h+=msCellHTML(i);
+  return h;
+}
+function msStatusHTML(){
+  const T=MS_THEMES[MS.theme],best=store.get(MS_BEST,{})[MS.theme+'|'+MS.lvl];
+  if(MS.over&&MS.won)return `<div class="msmsg win"><b>${T.win}</b><span>${T.winSub} En ${msSec(MS.elapsed)}${MS.record?' · nouveau record !':''}</span></div>`;
+  if(MS.over)return `<div class="msmsg lose"><b>${T.lose}</b><span>${T.loseSub}</span></div>`;
+  return `<p class="note">${T.help}${best?` <b>Ton record : ${msSec(best)}.</b>`:''}</p>`;
+}
+function msPaint(){
+  const b=$('#msBoard');if(!b)return;
+  b.innerHTML=msBoardHTML();
+  $('#msLeft').textContent=msLed(MS.m-MS.flags);
+  $('#msTime').textContent=msLed(MS.started?Math.floor((MS.over?MS.elapsed:Date.now()-MS.t0)/1000):0);
+  $('#msFace').innerHTML=msFaceSVG(MS.face);
+  $('#msStatus').innerHTML=msStatusHTML();
+  $('#msMode').innerHTML=msModeHTML();
+}
+function msModeHTML(){
+  const T=MS_THEMES[MS.theme];
+  return `<button type="button" data-act="msmode" data-v="dig" aria-pressed="${MS.mode==='dig'}">Révéler</button><button type="button" data-act="msmode" data-v="flag" aria-pressed="${MS.mode==='flag'}">${T.flag}</button>`;
+}
+function msRender(){
+  const T=MS_THEMES[MS.theme],cs=msCellSize();
+  $('#main').innerHTML=`<div class="body ms">
+    <button class="link" type="button" data-act="home">← Tous les jeux</button>
+    <header class="hero"><span class="emblem minee big">${icon('mine',2.2)}</span><h1 class="title">Démineur</h1></header>
+    <div class="msthemes" role="radiogroup" aria-label="Thème">${Object.entries(MS_THEMES).map(([k,v])=>`<button type="button" role="radio" class="mst t-${k}" data-act="mstheme" data-v="${k}" aria-checked="${k===MS.theme}"><span class="msti">${msMineSVG(k)}</span><span>${v.name.replace('Chocolatine','Choco&shy;latine')}</span></button>`).join('')}</div>
+    <div class="msrow"><div class="seg" role="radiogroup" aria-label="Niveau">${MS_LEVELS.map((l,i)=>`<button type="button" data-act="mslvl" data-v="${i}" aria-pressed="${i===MS.lvl}">${l.n}</button>`).join('')}</div></div>
+    <div class="msframe t-${MS.theme}" style="--cs:${cs}px;--cols:${MS.c}">
+      <div class="mshead"><span class="led" id="msLeft" aria-label="${T.mines} restants">${msLed(MS.m-MS.flags)}</span>
+        <button class="msface" id="msFace" type="button" data-act="msnew" aria-label="Nouvelle partie">${msFaceSVG(MS.face)}</button>
+        <span class="led" id="msTime" aria-label="Chrono">000</span></div>
+      <div class="msscroll"><div class="msboard" id="msBoard">${msBoardHTML()}</div></div>
+    </div>
+    <div class="msrow"><span class="eyebrow" style="margin:0">Toucher pour</span><div class="seg" id="msMode">${msModeHTML()}</div></div>
+    <div id="msStatus" aria-live="polite">${msStatusHTML()}</div>
+    <p class="note">Appui long (ou clic droit) : poser ou retirer ${T.aFlag}. Toucher un chiffre déjà entouré du bon nombre de ${T.flags} révèle les autres cases autour.</p>
+    <div class="row"><button class="btn ghost" type="button" data-act="msnew">Nouvelle partie</button></div>
+  </div>`;
+  msWire();
+}
+function msWire(){
+  const m=$('#main');
+  m.onclick=e=>{
+    const b=e.target.closest('[data-act]');if(!b)return;
+    const a=b.dataset.act;
+    if(a==='home'){clearInterval(msTimer);msTimer=null;renderHome();}
+    else if(a==='msnew'){msNew();msRender();}
+    else if(a==='mstheme'){MSP.theme=b.dataset.v;store.set(MS_KEY,MSP);if(MS.started&&!MS.over){MS.theme=MSP.theme;msRender();}else{msNew();msRender();}}
+    else if(a==='mslvl'){MSP.lvl=+b.dataset.v;store.set(MS_KEY,MSP);msNew();msRender();}
+    else if(a==='msmode'){MS.mode=b.dataset.v;$('#msMode').innerHTML=msModeHTML();}
+  };
+  const board=$('#msBoard');
+  let lp=null,lpFired=false,downAt=null,lastType='mouse';
+  const cellOf=e=>{const c=e.target.closest('.msc');return c?+c.dataset.i:null;};
+  const pressFace=on=>{if(MS.over)return;const f=$('#msFace');if(f)f.innerHTML=msFaceSVG(on?'press':'idle');};
+  board.addEventListener('pointerdown',e=>{
+    lastType=e.pointerType;if(e.button>0)return;
+    const i=cellOf(e);if(i===null||MS.over)return;
+    lpFired=false;downAt={x:e.clientX,y:e.clientY,i};
+    pressFace(true);
+    clearTimeout(lp);
+    lp=setTimeout(()=>{lpFired=true;pressFace(false);if(!MS.open[i]){msToggleFlag(i);msPaint();}},380);
+  });
+  board.addEventListener('pointermove',e=>{
+    if(downAt&&Math.hypot(e.clientX-downAt.x,e.clientY-downAt.y)>10){clearTimeout(lp);downAt=null;pressFace(false);}
+  });
+  const cancel=()=>{clearTimeout(lp);downAt=null;pressFace(false);};
+  board.addEventListener('pointercancel',cancel);
+  board.addEventListener('pointerleave',e=>{if(e.pointerType==='mouse')cancel();});
+  board.addEventListener('pointerup',e=>{
+    clearTimeout(lp);
+    if(!downAt||e.button>0){pressFace(false);return;}
+    const i=downAt.i;downAt=null;
+    if(lpFired){lpFired=false;return;}
+    msAct(i,MS.mode==='flag');
+  });
+  board.addEventListener('contextmenu',e=>{
+    e.preventDefault();
+    if(lastType!=='mouse')return;
+    const i=cellOf(e);if(i===null)return;
+    clearTimeout(lp);downAt=null;
+    if(MS.open[i])msAct(i,false);else{msToggleFlag(i);msPaint();}
+  });
+  board.addEventListener('keydown',e=>{
+    const i=cellOf(e);if(i===null)return;
+    if(e.key==='Enter'||e.key===' '){e.preventDefault();msAct(i,false);}
+    else if(e.key==='f'||e.key==='F'||e.key==='d'||e.key==='D'){e.preventDefault();if(!MS.open[i]){msToggleFlag(i);msPaint();}}
+    else{
+      const d={ArrowLeft:-1,ArrowRight:1,ArrowUp:-MS.c,ArrowDown:MS.c}[e.key];
+      if(d===undefined)return;e.preventDefault();
+      const j=i+d;if(j<0||j>=MS.n||(Math.abs(d)===1&&((j/MS.c)|0)!==((i/MS.c)|0)))return;
+      const el=board.querySelector(`[data-i="${j}"]`);if(el)el.focus();
+    }
+  });
+}
+function msAct(i,flagMode){
+  if(MS.over)return;
+  if(MS.open[i])msChord(i);
+  else if(flagMode)msToggleFlag(i);
+  else msReveal(i);
+  if(!MS.over)MS.face='idle';
+  const had=document.activeElement&&document.activeElement.dataset&&document.activeElement.dataset.i;
+  msPaint();
+  if(had!==undefined){const el=$('#msBoard')?.querySelector(`[data-i="${had}"]`);if(el)el.focus({preventScroll:true});}
+}
+function goMS(){
+  APP='ms';CL.on=false;applyTheme(null,null);
+  if(NET.on)netStop();
+  document.documentElement.dataset.phase='night';
+  $('#bar').hidden=true;$('#narr').hidden=true;
+  msNew();msRender();
+  window.scrollTo(0,0);
+}
+window.addEventListener('resize',()=>{
+  if(APP!=='ms'||!MS)return;
+  const f=document.querySelector('.msframe');if(f)f.style.setProperty('--cs',msCellSize()+'px');
+});
 /* ================= Scores de la soirée et statistiques ================= */
 const SCORES_KEY='veillee-scores',STATS_KEY='veillee-stats';
 function loadScores(){
@@ -6555,7 +6877,7 @@ const jujuSVG=uid=>{
 };
 // Qui a proposé chaque jeu : un portrait dessiné et un prénom (d'autres copains viendront avec leurs jeux)
 const AUTHORS={lili:{name:'Lili',face:liliSVG},juju:{name:'Juju',face:jujuSVG}};
-const GAME_BY={lg:'lili',uc:'lili',sp:'lili',mi:'lili',bn:'juju'};
+const GAME_BY={lg:'lili',uc:'lili',sp:'lili',mi:'lili',bn:'juju',ms:'lili'};
 const authorHTML=g=>{const a=AUTHORS[GAME_BY[g]];return a?`<span class="author">${a.face(g)}<span>Jeu proposé par <b>${esc(a.name)}</b></span></span>`:'';};
 function goLG(){
   renderSetup();
@@ -6583,12 +6905,13 @@ function renderHome(){
       <button class="gametile" type="button" data-act="sp"><span class="emblem mask">${icon('eye',2.2)}</span><span class="gt"><b>L'Espion</b><span>Tout le monde connaît le lieu secret, sauf l'espion. Questionnez-vous pour le démasquer… sans trop en dire.</span><span class="meta2">3 à 12 joueurs · 10 min</span>${authorHTML('sp')}</span></button>
       <button class="gametile" type="button" data-act="mi"><span class="emblem wolf">${icon('shield',2.2)}</span><span class="gt"><b>Les Missions</b><span>Des traîtres sabotent en secret les missions de la résistance. Personne n'est éliminé : tout le monde joue jusqu'au bout.</span><span class="meta2">5 à 10 joueurs · 30 min</span>${authorHTML('mi')}</span></button>
       <button class="gametile" type="button" data-act="bn"><span class="emblem navy">${icon('anchor',2.2)}</span><span class="gt"><b>Touché-coulé</b><span>La bataille navale à deux, chacun sur son téléphone : place ta flotte, tire, et déclenche le pouvoir de ton capitaine.</span><span class="meta2">2 joueurs · 15 min</span>${authorHTML('bn')}</span></button>
+      <button class="gametile" type="button" data-act="ms"><span class="emblem minee">${icon('mine',2.2)}</span><span class="gt"><b>Démineur</b><span>Le grand classique, à jouer seul, en cinq versions : classique, politique, le port, chocolatine et la thèse.</span><span class="meta2">1 joueur · 5 min</span>${authorHTML('ms')}</span></button>
     </div>
     ${NET.room&&subtle?`<button class="btn ghost" type="button" data-act="asplayer">Je suis joueur · rejoindre une partie</button>`:''}
     ${scoreboardHTML()}`);
   $('#main').onclick=e=>{
     const a=e.target.closest('[data-act]')?.dataset.act;
-    if(a==='lg')goLG();else if(a==='uc')goUC();else if(a==='sp'||a==='mi')xGo(a);else if(a==='bn'){if(NET.on)netStop();location.href='touche-coule.html';}else if(a==='asplayer')clientMode();
+    if(a==='lg')goLG();else if(a==='uc')goUC();else if(a==='sp'||a==='mi')xGo(a);else if(a==='bn'){if(NET.on)netStop();location.href='touche-coule.html';}else if(a==='ms')goMS();else if(a==='asplayer')clientMode();
     else if(a==='resumex')resumeX();else if(a==='dropx'){clearXSave();renderHome();}
     else if(a==='resumelg')resumeLG();else if(a==='resumeuc')resumeUC();
     else if(a==='droplg'){clearLGSave();renderHome();}else if(a==='dropuc'){clearUCSave();renderHome();}
