@@ -488,6 +488,12 @@ html.big .btn{font-size:20px;min-height:62px}
 .locs{border:1.5px solid var(--line);border-radius:12px;padding:10px 12px}
 .locs summary{cursor:pointer;font-weight:700}
 .locs .loclist{margin-top:10px}
+.tnotes{display:flex;flex-direction:column;gap:8px}
+.tnotes:empty{display:none}
+.howto{margin-top:12px;text-align:left;border-top:1px solid var(--line);padding-top:10px}
+.howto summary{cursor:pointer;font-weight:700;color:var(--accent);list-style-position:inside}
+.howto p{margin:8px 0 0;font-size:15px;line-height:1.4}
+.card.neutral{--team:var(--accent)}
 </style><style>[hidden]{display:none!important}:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}img{max-width:100%}</style>
 </head>
 <body>
@@ -3060,8 +3066,12 @@ for(const k of Object.keys(CLIPS)){const base=k.split('~')[0];(VARIANTS[base]=VA
 const variant=k=>{const v=VARIANTS[k];return v&&v.length?v[Math.floor(Math.random()*v.length)]:k;};
 let actx=null,master=null,voiceBus=null,buffers={},current=new Set();
 function b64ToBuf(b){const s=atob(b),u=new Uint8Array(s.length);for(let i=0;i<s.length;i++)u[i]=s.charCodeAt(i);return u.buffer;}
+// Les clips décodés prennent beaucoup de mémoire : on ne garde que les 40 derniers utilisés
+const BUF_ORDER=[];
 function decode(k){
   if(!buffers[k])buffers[k]=new Promise((res,rej)=>{try{actx.decodeAudioData(b64ToBuf(CLIPS[k].a),res,rej);}catch(e){rej(e);}});
+  const i=BUF_ORDER.indexOf(k);if(i>=0)BUF_ORDER.splice(i,1);BUF_ORDER.push(k);
+  while(BUF_ORDER.length>40)delete buffers[BUF_ORDER.shift()];
   return buffers[k];
 }
 function unlockAudio(){
@@ -3186,7 +3196,7 @@ function stopAmbient(){
 function duck(on){if(AMB.gain&&AMB.nodes&&actx){try{AMB.gain.gain.setTargetAtTime(on?.16:.32,actx.currentTime,.3);}catch(e){}}}
 let wakeLock=null;
 async function keepAwake(){try{if('wakeLock' in navigator)wakeLock=await navigator.wakeLock.request('screen');}catch(e){}}
-document.addEventListener('visibilitychange',()=>{if((G||UC||CL.gr)&&document.visibilityState==='visible')keepAwake();});
+document.addEventListener('visibilitychange',()=>{if((G||UC||CL.gr||NET.on)&&document.visibilityState==='visible')keepAwake();});
 
 /* ---------- Moteur asynchrone (annulable) ---------- */
 const ABORT=Symbol('abort'),FALLBACK=Symbol('fallback');
@@ -3239,8 +3249,9 @@ function renderTask(t,names,done){
   if(t.result)body+=`<p class="result ${t.result.yes?'yes':'no'}">${esc(t.result.text)}</p>`;
   if(t.card&&ROLES[t.card])body+=card(t.card,!!t.tip);
   if(t.xcard)body+=xCardHTML(t.xcard);
+  if(t.howto)body+=howtoBox(t.howto);
   if(t.secret!=null)body+=secretBox(t.secret);
-  body+=[].concat(t.note||[]).filter(Boolean).map(x=>`<p class="note">${esc(x)}</p>`).join('');
+  body+=`<div class="tnotes">${[].concat(t.note||[]).filter(Boolean).map(x=>`<p class="note">${esc(x)}</p>`).join('')}</div>`;
   let actions='';
   const n=t.n||1;
   if(t.t==='pick'){
@@ -3306,8 +3317,48 @@ const teamClass=t=>t==='loups'?'wolf':t==='solo'?'solo':'';
 function card(role,tip){
   const r=ROLES[role];
   const label={loups:'Camp des loups',village:'Camp du village',solo:'Solitaire'}[r.team];
-  return `<div class="card"><span class="team">${label}</span><div class="glyph">${icon(r.icon,2.2)}</div><h3 class="card-name">${r.name}</h3><p class="card-desc">${r.desc}</p>${tip&&DISC&&CARD_EX[role]?`<p class="card-ex"><b>Exemple</b> · ${esc(cardExample(role))}</p>`:''}${tip&&r.tip?`<p class="card-tip">${esc(r.tip)}</p>`:''}</div>`;
+  return `<div class="card neutral"><span class="team">${label}</span><div class="glyph">${icon(r.icon,2.2)}</div><h3 class="card-name">${r.name}</h3><p class="card-desc">${r.desc}</p>${tip&&DISC&&CARD_EX[role]?`<p class="card-ex"><b>Exemple</b> · ${esc(cardExample(role))}</p>`:''}${tip?howtoHTML(role):''}${tip&&r.tip?`<p class="card-tip">${esc(r.tip)}</p>`:''}</div>`;
 }
+/* Fiches « Comment jouer mon rôle » : quand et comment agir dans l'appli. Repliées par défaut (même taille pour tous). */
+const HOWTO={
+  loup:["Chaque nuit, la voix appelle les loups-garous : ouvrez les yeux tous ensemble.","Touchez la victime choisie, puis « Dévorer ». Sur vos téléphones, votez tous pour le même joueur : les votes des autres loups s'affichent au fur et à mesure.","Le jour, défends-toi comme un villageois et vote comme tout le monde."],
+  grandmechant:["Tu te réveilles d'abord avec les autres loups pour choisir la victime commune.","Ensuite la voix t'appelle seul : touche une seconde victime, puis « Dévorer ».","Dès qu'un loup est mort, tu perds ce pouvoir. La voix t'appelle quand même chaque nuit : garde simplement les yeux fermés."],
+  infect:["Tu te réveilles avec les loups. Une fois la victime choisie, ton téléphone te demande si tu veux l'infecter plutôt que la dévorer.","Une seule fois par partie. L'infecté devient loup en gardant son pouvoir, et il l'apprend dans la nuit : la voix appelle son numéro secret.","L'appel du numéro a lieu chaque nuit, qu'il y ait une infection ou non, pour que personne ne devine rien."],
+  voyante:["Chaque nuit, quand la voix t'appelle, ouvre les yeux.","Touche le joueur dont tu veux voir la carte, puis « Voir sa carte ». Elle s'affiche : mémorise-la, touche le bouton, puis referme les yeux.","Ce que tu as vu reste noté dans « Mes infos »."],
+  sorciere:["Chaque nuit, après les loups, la voix t'appelle. Le téléphone t'indique qui les loups ont attaqué.","Potion de vie : touche « Sauver… » pour le sauver, ou « Ne pas utiliser ». Potion de mort : touche un joueur pour l'empoisonner, ou « Garder ma potion ».","Chaque potion ne sert qu'une fois. Une fois les deux utilisées, la voix t'appelle quand même : garde les yeux fermés."],
+  chasseur:["Rien à faire la nuit.","Quand tu meurs, la nuit ou au vote, le téléphone affiche « Dernière balle du chasseur » : touche le joueur que tu emportes avec toi, puis « Tirer »."],
+  cupidon:["La première nuit seulement, la voix t'appelle : touche deux joueurs (tu peux te choisir), puis « Unir ces deux joueurs ».","Ensuite, les amoureux se reconnaissent : selon le réglage, la voix appelle leurs numéros secrets, ou tu leur touches l'épaule.","Tu n'as plus rien à faire ensuite."],
+  salvateur:["Chaque nuit, la voix t'appelle : touche le joueur que tu protèges des loups cette nuit (toi compris), puis « Protéger ».","Tu ne peux pas protéger la même personne deux nuits de suite.","Ta protection ne bloque pas la potion de mort de la sorcière."],
+  petitefille:["Rien à toucher sur le téléphone.","Quand les loups se réveillent, tu peux entrouvrir les yeux pour les espionner… mais s'ils te surprennent, tu deviens une cible."],
+  ancien:["Rien à faire : tout est automatique.","La première attaque des loups ne te tue pas (personne n'est prévenu). Si le village t'élimine, tous les villageois perdent leurs pouvoirs."],
+  idiot:["Rien à faire.","Si le village vote contre toi, ta carte est révélée et tu restes en vie, mais tu ne votes plus."],
+  bouc:["Rien à faire.","En cas d'égalité au vote du village, c'est toi qui es éliminé."],
+  montreur:["Rien à faire : chaque matin, le téléphone annonce si ton ours grogne.","Il grogne si l'un de tes deux voisins vivants (dans le plan de table) est un loup. Personne ne sait qui est le montreur."],
+  renard:["Chaque nuit, la voix t'appelle : touche un joueur, puis « Flairer ». Le téléphone te dit si un loup se cache parmi lui et ses deux voisins vivants.","Si tu ne trouves aucun loup, tu perds ton flair. La voix t'appelle quand même les nuits suivantes : garde simplement les yeux fermés."],
+  corbeau:["Chaque nuit, la voix t'appelle : touche un joueur, puis « Accuser » (ou « Ne désigner personne »).","Le lendemain, ce joueur commence le vote avec deux voix contre lui. Le téléphone l'annonce, sans dire qui est le corbeau."],
+  chevalier:["Rien à faire.","Si les loups te dévorent, le premier loup assis à ta gauche (sens des aiguilles d'une montre) meurt le matin suivant."],
+  chaperon:["Rien à faire.","Tant que le chasseur est vivant, les loups ne peuvent pas te tuer (leur attaque échoue en silence)."],
+  soeur:["La première nuit, la voix appelle les sœurs : ouvrez les yeux et reconnaissez-vous. Le téléphone affiche vos noms.","Les yeux restent ouverts un moment, le temps de vous regarder. Ensuite, plus rien à faire."],
+  frere:["La première nuit, la voix appelle les frères : ouvrez les yeux et reconnaissez-vous. Le téléphone affiche vos noms.","Les yeux restent ouverts un moment, le temps de vous regarder. Ensuite, plus rien à faire."],
+  juge:["Une fois par partie, tu peux demander un second vote, le même jour.","Sur ton téléphone, le jour : touche « Voir mon rôle et mes infos », puis « Juge bègue : demander un second vote ». Fais-le avant la fin du moment où tout le monde ferme les yeux, juste après le premier vote.","Ce rôle n'existe que si chacun joue sur son propre téléphone : personne ne voit ta demande."],
+  servante:["Quand un joueur est éliminé par le vote, une question s'affiche sur tous les téléphones pendant quelques secondes : « Prendre la place de… ? ».","Si tu veux sa carte, touche « Me dévoiler et prendre son rôle » : tu te dévoiles et tu récupères son rôle sans le montrer. Sinon, touche « Ne rien faire », comme tout le monde.","Une seule fois par partie. Ce rôle n'existe que si chacun joue sur son propre téléphone."],
+  comedien:["Chaque nuit, la voix t'appelle : choisis l'un des rôles proposés (ou « Ne rien jouer »), puis utilise son pouvoir comme ce rôle le ferait.","Chaque rôle ne peut être joué qu'une fois. Quand il n'en reste plus, la voix t'appelle quand même : garde les yeux fermés."],
+  voleur:["La première nuit seulement, la voix t'appelle : le téléphone montre les deux cartes mises de côté.","Touche celle que tu prends, ou « Garder ma carte » pour rester simple villageois. Si les deux sont des loups, tu dois en prendre une."],
+  enfantsauvage:["La première nuit, la voix t'appelle : touche le joueur qui sera ton modèle, puis « Choisir ce modèle ».","Si ton modèle meurt, tu deviens loup-garou : ton téléphone (ou « Mes infos ») te le dit, et tu te réveilles ensuite avec la meute."],
+  chienloup:["La première nuit, la voix t'appelle : choisis « Chien fidèle du village » ou « Devenir loup-garou ».","Ce choix est définitif. Si tu deviens loup, tu te réveilles ensuite avec la meute."],
+  loupblanc:["Tu te réveilles chaque nuit avec les loups pour choisir la victime commune.","Une nuit sur deux (les nuits paires), la voix t'appelle seul : touche un loup pour le dévorer, ou « Ne dévorer personne ».","Tu gagnes si tu es le dernier survivant."],
+  flute:["Chaque nuit, la voix t'appelle : touche deux joueurs à charmer, puis « Charmer ».","Les charmés se réveillent ensuite et se reconnaissent. Tu gagnes quand tous les joueurs encore en vie sont charmés."],
+  ange:["Rien à faire la nuit.","Tu gagnes seul si tu es éliminé dès le premier tour (le premier vote ou la première nuit). Fais-toi soupçonner !"],
+  villageois:["Rien à faire la nuit : garde les yeux fermés.","Le jour, débats et vote pour éliminer les loups. Selon le réglage, le vote se fait à main levée, ou en secret sur ton téléphone."]
+};
+const howtoBox=(lines,foot)=>`<details class="howto"><summary>Comment jouer mon rôle</summary>${lines.map(x=>`<p>${esc(x)}</p>`).join('')}${foot?`<p class="note">${esc(foot)}</p>`:''}</details>`;
+function howtoHTML(role){
+  const l=HOWTO[role];if(!l)return '';
+  return howtoBox(l,"Tes actions se font sur ton téléphone, ou sur le téléphone central si tu joues dessus. Garde les yeux fermés tant que la voix n'appelle pas ton rôle.");
+}
+const HOWTO_UC=["Chacun à son tour, dans l'ordre affiché, dit un mot ou une courte phrase en rapport avec son mot, sans le donner.","Ensuite, tout le monde vote pour éliminer un joueur : à main levée sur le téléphone central, ou en secret sur son téléphone.","Mr White n'a pas de mot : il improvise. S'il est éliminé, il propose un mot (sur son téléphone ou sur le téléphone central) pour tenter de gagner.","Un trou de mémoire ? « Mon mot » sur le téléphone central, ou « Voir mon mot » sur ton téléphone."];
+const HOWTO_SP=["Chacun pose à tour de rôle une question à un autre joueur, qui répond puis interroge quelqu'un d'autre.","Pour accuser quelqu'un, touchez « J'accuse quelqu'un » sur le téléphone central : tous les autres doivent être d'accord.","L'espion peut se dévoiler pendant les questions pour deviner le lieu : « L'espion se dévoile (si c'est toi) » sur son téléphone, ou « L'espion se dévoile » sur le téléphone central.","La liste des lieux possibles est affichée pour tout le monde."];
+const HOWTO_MI=["Le chef propose une équipe en touchant les noms sur le téléphone central, puis chacun vote pour ou contre cette équipe.","Si tu fais partie de l'équipe, ta carte de mission s'affiche : touche « Réussite » ou « Sabotage » (l'ordre change à chaque fois). Pour un résistant, les deux comptent comme une réussite.","Si la résistance gagne trois missions, l'assassin désigne sur le téléphone central le joueur qu'il croit être Merlin.","Un trou de mémoire ? « Ma carte » sur le téléphone central, ou « Voir ma carte » sur ton téléphone."];
 const usesNumbers=()=>G&&((has('cupidon')&&setup.settings.lovers==='numeros')||has('infect')||(G.extra||[]).includes('infect')||(G.fakeRoles||[]).includes('infect')||has('flute'));
 const sleepPanel=()=>`<div class="sleep"><p>Les yeux fermés.<br>Écoutez la voix.</p></div>`;
 
@@ -3425,15 +3476,22 @@ async function netStart(kind='lg'){
     NET.gr.onPeers(ch=>{netPeers();if(ch.joined.length)netPub();});
     NET.hb=setInterval(netBeat,2500);
     netPub();
-  }catch(e){NET.on=false;NET.gr=null;}
+    keepAwake();
+  NET.err=false;
+  }catch(e){NET.on=false;NET.gr=null;NET.err=true;}
   NET.starting=false;
   if(APP==='lg'&&!G)renderSetup();
   if(APP==='uc'&&!UC)ucRenderSetup();
   if(isX(APP)&&!XG)xRenderSetup(APP);
 }
+// Salle en cours d'ouverture, ou échec (serveur de connexion injoignable) avec un bouton pour réessayer
+const roomOpening=()=>NET.err?`<p class="warn">Impossible d'ouvrir la salle : vérifie la connexion internet de ce téléphone, puis réessaie.</p><button class="btn ghost small" type="button" data-act="netretry">Réessayer</button>`:`<p class="note">Ouverture de la salle…</p>`;
+document.addEventListener('click',e=>{if(!e.target.closest||!e.target.closest('[data-act=netretry]'))return;NET.err=false;const k=APP==='uc'?'uc':isX(APP)?APP:'lg';netStart(k);if(APP==='lg'&&!G)renderSetup();if(APP==='uc'&&!UC)ucRenderSetup();if(isX(APP)&&!XG)xRenderSetup(APP);});
 async function netStop(){
   if(!NET.on)return;
   clearInterval(NET.hb);NET.on=false;
+  // On prévient les téléphones que cette partie est fermée, pour qu'ils ne restent pas bloqués sur « reconnexion… »
+  try{await NET.gr.emit('pub',{game:NET.kind,code:NET.code,closed:true,names:[],owners:{}});}catch(e){}
   try{await NET.gr.leave();}catch(e){}
   NET.room.presence({host:null,game:null}).catch(()=>{});
   Object.assign(NET,{gr:null,code:null,owners:{},ownerBy:{},peerPk:{},seatKeys:{},lastAct:{},R:{},waiters:{}});
@@ -3446,7 +3504,7 @@ function netPeers(){
   const peers=NET.gr.peers(),n=seatCount();
   if(!inGame())for(const s of Object.keys(NET.owners)){
     const pr=peers.find(x=>x.peer===NET.owners[s]);
-    if(!pr||+s>=n||!pr.presence||pr.presence.seat!==+s)delete NET.owners[s];
+    if(!pr||+s>=n||!pr.presence||pr.presence.seat!==+s){delete NET.owners[s];delete NET.ownerBy[s];}
   }
   for(const p of peers){
     if(p.sameTab||p.kind!=='viewer')continue;
@@ -3464,8 +3522,14 @@ function netPeers(){
 function claim(p,seat){
   const cur=NET.owners[seat];
   if(cur!==p.peer){
-    if(cur&&NET.gr.peers().some(x=>x.peer===cur))return;               // place déjà prise
-    if(inGame()&&NET.ownerBy[seat]&&NET.ownerBy[seat]!==p.by)return;           // en partie : seule la même personne peut revenir
+    const curAlive=cur&&NET.gr.peers().some(x=>x.peer===cur);
+    const same=!!(p.by&&NET.ownerBy[seat]===p.by);                    // le même téléphone qui revient (rechargement)
+    if(inGame()){
+      // Une partie en cours ne se rejoint pas : seul un joueur qui jouait déjà sur son téléphone peut revenir à sa place
+      if(NET.kind==='lg'&&G&&G.central.has(seat))return;
+      if(NET.ownerBy[seat]){if(!same)return;}
+      else if(!cur||curAlive)return;
+    } else if(curAlive&&!same)return;                                    // place déjà prise
     for(const s of Object.keys(NET.owners))if(NET.owners[s]===p.peer)delete NET.owners[s];
     NET.owners[seat]=p.peer;if(p.by)NET.ownerBy[seat]=p.by;
     NET.peerPk[seat]=null;NET.seatKeys[seat]=null;NET.lastAct[seat]=null;
@@ -3519,7 +3583,7 @@ function setR(seat,patch){
 function netInitGame(){
   if(NET.kind!=='lg')return;
   NET.R={};NET.waiters={};NET.log=[];
-  if(G)for(const p of G.players)if(!G.central.has(p.id))NET.R[p.id]={gid:G.gid,ver:++NET.ver,role:p.role,num:usesNumbers()?p.num:null,alive:true,notes:[],info:[],task:null};
+  if(G)for(const p of G.players)if(!G.central.has(p.id))NET.R[p.id]={gid:G.gid,ver:++NET.ver,role:p.role,num:usesNumbers()?p.num:null,alive:p.alive,notes:[],info:[],task:null};
   for(const s of Object.keys(NET.owners))sendState(+s);
   netPub();
 }
@@ -3538,7 +3602,7 @@ function cancelTasks(seat){
   for(const [id,w] of Object.entries(NET.waiters))if(w.seat===seat)delete NET.waiters[id];
   if(NET.R[seat]&&NET.R[seat].task)setR(seat,{task:null});
 }
-const waitPanel=()=>`<div class="sleep"><p>Les yeux fermés.<br>Un joueur agit sur son téléphone…</p></div>`;
+const waitPanel=()=>G&&G.phase==='day'?`<div class="sleep"><p>Un joueur répond sur son téléphone…</p></div>`:`<div class="sleep"><p>Les yeux fermés.<br>Un joueur agit sur son téléphone…</p></div>`;
 const fallbackLink=`<button class="link" type="button" data-act="here" style="align-self:center">Un téléphone ne répond pas ? Continuer sur celui-ci</button>`;
 
 // Action d'un joueur : sur son téléphone s'il est connecté, sinon sur le téléphone central
@@ -3556,14 +3620,20 @@ function wolfWhere(p){
     ?'La meute vote sur vos téléphones : votez tous pour la même victime.'
     :'La meute vote sur le téléphone central, car un loup y joue : quand la voix vous appelle, regardez le téléphone posé au milieu.';
 }
-// Joueur prévu sur son téléphone mais momentanément déconnecté : on lui laisse le temps de revenir
-async function awaitPhone(p,ms=20000){
-  if(!NET.on||!G||G.central.has(p.id)||remoteOK(p))return remoteOK(p);
-  view(waitPanel());
+// Joueurs prévus sur leur téléphone mais momentanément déconnectés : on leur laisse le temps de revenir
+// (une seule fois par nuit ; ensuite on passe directement au téléphone central). On peut aussi passer tout de suite.
+async function awaitPhones(list,ms){
+  if(!NET.on||!G)return;
+  G.offline=G.offline||[];
+  const todo=()=>list.filter(p=>!G.central.has(p.id)&&!remoteOK(p)&&!G.offline.includes(p.id));
+  if(!todo().length)return;
+  view(waitPanel(),fallbackLink);
+  let skip=false;ask().then(()=>{skip=true;});
   const t0=Date.now();
-  while(Date.now()-t0<ms){await wait(500);if(remoteOK(p))return true;}
-  return false;
+  while(Date.now()-t0<ms&&!skip&&todo().length)await wait(400);
+  for(const p of todo())G.offline.push(p.id);
 }
+async function awaitPhone(p,ms=15000){await awaitPhones([p],ms);return remoteOK(p);}
 async function act(p,task){
   if(!remoteOK(p)&&!(await awaitPhone(p)))return centralTask(task);
   const rp=remoteTask(p.id,task);
@@ -3582,7 +3652,7 @@ async function act(p,task){
 // Information pour un groupe (amoureux, sœurs, charmés…) : sur leurs téléphones, et au centre si l'un d'eux n'en a pas
 async function informGroup(members,task){
   if(!members.length)return;
-  for(const m of members)if(!remoteOK(m))await awaitPhone(m,12000);
+  await awaitPhones(members,12000);
   const rem=members.filter(remoteOK);
   const all=Promise.all(rem.map(m=>remoteTask(m.id,task)));
   if(rem.length<members.length){
@@ -3612,7 +3682,12 @@ function tableHTML(names,o={}){
   }).join('');
   return `<div class="table ${n>16?'tiny':''}"><div class="ring"><span>${o.center||'↻'}</span></div>${seats}</div>`;
 }
+// Dès qu'un téléphone a choisi son nom, on ne réorganise plus la table : chaque téléphone est lié à une place,
+// et déplacer les prénoms donnerait à chacun la carte d'un autre.
+const seatsLocked=()=>!!(NET.on&&NET.owners&&Object.keys(NET.owners).length);
+const LOCK_NOTE=`<p class="warn">Des téléphones sont déjà connectés : le plan de table et les groupes sont verrouillés, sinon chacun recevrait la carte d'un autre. Organisez la table avant que les joueurs rejoignent.</p>`;
 function seatingBlock(prefix,names,sel){
+  if(seatsLocked())return `<div class="seating">${tableHTML(names,{center:'La parole tourne<br>dans ce sens ↻'})}${LOCK_NOTE}</div>`;
   const has=sel!=null&&sel<names.length;
   return `<div class="seating">
     ${tableHTML(names,{prefix,sel:has?sel:null,center:'La parole tourne<br>dans ce sens ↻'})}
@@ -3625,6 +3700,7 @@ function seatingBlock(prefix,names,sel){
 /* Applique une action du plan de table sur les listes de la partie (prénoms et choix de téléphone).
    Renvoie la nouvelle sélection, ou undefined si l'action ne concerne pas le plan. */
 function seatingAction(prefix,act,i,sel,count,lists){
+  if(act.startsWith(prefix)&&seatsLocked())return null;
   const fill=a=>{while(a.length<count)a.push(a===lists[0]?'':'phone');a.length=count;};
   lists.forEach(fill);
   const swap=(x,y)=>lists.forEach(a=>{[a[x],a[y]]=[a[y],a[x]];});
@@ -3730,9 +3806,16 @@ function applyTheme(id,ren){
   return true;
 }
 const themeText=s=>TH_RX&&s?s.replace(TH_RX,(m,pre,k)=>{const v=TH_MAP.get(k);return pre+(v==null?k:v);}):s;
+// Prénoms des joueurs : jamais transformés (un joueur qui s'appelle « Ange » reste « Ange »)
+function playerNames(){
+  const l=typeof G!=='undefined'&&G&&G.players?G.players.map(p=>p.name):typeof CL!=='undefined'&&CL.pub&&Array.isArray(CL.pub.names)?CL.pub.names:typeof setup!=='undefined'?effectiveNames():[];
+  return new Set(l.map(x=>String(x).trim()));
+}
 function fixText(n){
   const p=n.parentNode;if(!p||(p.closest&&p.closest('.nt,textarea,script,style')))return;
-  const v=n.nodeValue,r=themeText(v);if(r!==v)n.nodeValue=r;
+  const v=n.nodeValue;
+  if(v&&v.trim()&&playerNames().has(v.trim()))return;
+  const r=themeText(v);if(r!==v)n.nodeValue=r;
 }
 function themeWalk(root){
   if(!TH_RX||!root)return;
@@ -4081,13 +4164,14 @@ async function startGame(){
   if(setup.count<4)return;
   const names=effectiveNames(),n=names.length,c=comp();
   const {dealt,extra}=buildDeck(n,c);
-  const nums=shuffle(Array.from({length:n},(_,i)=>i+1));
+  const span=Math.min(24,Math.max(n+3,Math.ceil(n*1.5)));
+  const pool=shuffle(Array.from({length:span},(_,i)=>i+1)),nums=pool.slice(0,n),spare=pool.slice(n);
   const inGameRoles=new Set(dealt.concat(extra));
   const comedienCards=c.comedien?shuffle(['voyante','salvateur','renard','corbeau'].filter(r=>!inGameRoles.has(r))).slice(0,3):[];
   G={gid:Math.random().toString(36).slice(2,10),players:names.map((name,i)=>({id:i,name,role:dealt[i],num:nums[i],alive:true,notes:[]})),night:0,phase:'deal',
      lovers:null,potions:{life:true,death:true},lastProtect:null,charmed:[],tetanus:null,noPowers:false,wolfDied:false,infectUsed:false,corbeauMark:null,angeWin:false,
-     mayor:null,judgeUsed:false,judgeAsk:false,servanteUsed:false,extra,comedienCards,chron:[],sus:{},central:new Set()};
-  G.central=new Set(G.players.filter(p=>!setup.settings.phones||seatMode(p.id)==='central').map(p=>p.id));
+     mayor:null,judgeUsed:false,judgeAsk:false,servanteUsed:false,extra,comedienCards,chron:[],sus:{},central:new Set(),spare,offline:[]};
+  G.central=new Set(G.players.filter(p=>!setup.settings.phones||seatMode(p.id)==='central'||!seatConnected(p.id)).map(p=>p.id));
   for(const p of G.players)p.startRole=p.role;
   G.theme=THEME;G.renames=Object.assign({},THEME_REN);G.disc=!!setup.settings.disc;G.seen={};DISC=G.disc;
   netInitGame();syncInfo();
@@ -4118,7 +4202,7 @@ function resumeLG(){
   runGame(s.stage);
 }
 async function resumeScreen(stage){
-  const label=stage==='day'?`le jour ${G.night}`:`la nuit ${G.night+1}`;
+  const label=stage==='day'?`le jour ${G.night}`:stage==='dawn'?`l'aube du jour ${G.night}`:stage==='dusk'?`la nuit ${G.night+1}`:`la nuit ${G.night+1}`;
   const remote=G.players.filter(p=>!G.central.has(p.id));
   const box=()=>NET.on&&remote.length?`<div class="joincode"><span class="eyebrow">Nouveau code de la partie</span><span class="code">${esc((NET.code||'').toUpperCase())}</span></div>
       ${shareBox('lg')}<p class="note">Les joueurs sur téléphone rejoignent avec ce code et retrouvent leur nom, leur rôle et leurs infos.</p>
@@ -4145,7 +4229,7 @@ async function deal(){
     await centralTask(cardTask(p));
   }
   if(rem.length){
-    progress=()=>{const l=$('#dealList');if(l)l.innerHTML=rem.map(p=>`<span class="pill ${seen.has(p.id)?'':'off'}">${esc(p.name)}${seen.has(p.id)?' ✓':''}</span>`).join('');};
+    progress=()=>{const l=$('#dealList');if(l)l.innerHTML=`<p class="note" style="text-align:center">${seen.size} carte${seen.size>1?'s':''} lue${seen.size>1?'s':''} sur ${rem.length}.</p>`;};
     view(`<p class="eyebrow">Distribution</p><h2 class="h">Chacun découvre sa carte sur son téléphone.</h2><div class="namelist" id="dealList"></div>`,
       `<button class="btn ghost" type="button" data-act="skip">Continuer sans attendre</button>`);
     progress();
@@ -4165,15 +4249,13 @@ async function deal(){
 
 async function loop(stage){
   while(true){
-    if(stage!=='day'){
-      saveLG('night');
-      G.night++;
-      await night();
-      const w=await dawn();if(w)return w;
+    if(stage==='night'||stage==='dawn'){
+      if(stage!=='dawn'){saveLG('night');G.night++;await night();}
+      const w=await dawn(stage==='dawn');if(w)return w;
+      stage='day';
     }
+    if(stage==='day'){saveLG('day');const w=await day();if(w)return w;}
     stage='night';
-    saveLG('day');
-    const w=await day();if(w)return w;
   }
 }
 
@@ -4185,11 +4267,12 @@ const KEEP_CALLING=['renard','sorciere','comedien','grandmechant','loupblanc'];
 const FAKE_CALL=['juge','voyante','salvateur','renard','corbeau','sorciere','grandmechant','loupblanc','comedien','enfantsauvage','chienloup'];
 async function turn(role,open,close,fn,ok=()=>true){
   const p=holder(role);
-  if(!p){if((G.fakeRoles||[]).includes(role)&&ok({id:-1}))await fakeTurn(open,close,role);return;}
+  const keep=KEEP_CALLING.includes(role)&&(!G.noPowers||ROLES[role].team!=='village');
+  if(!p){if((G.fakeRoles||[]).includes(role)&&(ok({id:-1})||keep))await fakeTurn(open,close,role);return;}
   if(!p.alive)return;
   // Un rôle vivant qui a perdu son pouvoir (renard sans flair, sorcière sans potion, comédien sans rôle) est quand même appelé :
   // sinon tout le monde l'apprendrait
-  if(!ok(p)){if(KEEP_CALLING.includes(role)&&(!G.noPowers||ROLES[role].team!=='village'))await fakeTurn(open,close,role);return;}
+  if(!ok(p)){if(keep)await fakeTurn(open,close,role);return;}
   await explain('r_'+role);
   await turnFor(p,open,close,fn);
 }
@@ -4219,7 +4302,7 @@ async function turnFor(p,open,close,fn){
 
 async function night(){
   G.phase='night';setPhase();window.scrollTo(0,0);
-  Object.assign(G,{victim:null,saved:false,poison:null,protect:null,gmlVictim:null,blancVictim:null,corbeau:null,newInfected:null,newCharmed:[]});
+  Object.assign(G,{victim:null,saved:false,poison:null,protect:null,gmlVictim:null,blancVictim:null,corbeau:null,newInfected:null,newCharmed:[],offline:[]});
   chronPhase(`Nuit ${G.night}`);
   view(sleepPanel());chime('night');unlockAudio();startAmbient();
   if(G.night===1)await say('welcome');
@@ -4261,7 +4344,7 @@ async function voleur(p){
   p.role=chosen;p.wasVoleur=true;
   // Les cartes restées de côté continuent d'être appelées « pour du faux » : personne ne doit deviner qu'elles manquent
   const rest=[a,b];rest.splice(rest.indexOf(chosen),chosen==='villageois'?0:1);
-  G.fakeRoles=rest.filter(k=>FAKE_CALL.includes(k));
+  G.fakeRoles=rest.filter(k=>FAKE_CALL.includes(k)||k==='infect');
   G.extra=[];
   addNote(p,chosen==='villageois'?'Voleur : tu as gardé ta carte, tu es simple villageois.':`Voleur : tu es devenu ${ROLES[chosen].name}.`);
   chron(`Le voleur (${p.name}) ${chosen==='villageois'?'garde sa carte':`devient ${ROLES[chosen].name}`}.`);
@@ -4475,6 +4558,16 @@ async function charmedWake(){
 function infectCalls(){const h=holder('infect');return h?h.alive:(G.fakeRoles||[]).includes('infect');}
 async function infectedNotice(){
   if(G.newInfected==null){
+    // Numéro « libre » (personne ne l'a) : personne ne se réveille, personne n'apprend rien
+    const spare=G.spare||[],dead=G.players.filter(x=>!x.alive);
+    const num=spare.length?spare[Math.floor(Math.random()*spare.length)]:dead.length?dead[Math.floor(Math.random()*dead.length)].num:null;
+    if(num!=null){
+      view(sleepPanel());
+      await say('inf_call','n'+num);
+      await wait(Math.max(15000,callSpan()));
+      await say('inf_close');await pw(1600);
+      return;
+    }
     const pack=alive().filter(isWolf);if(!pack.length)return;
     const w=pack[Math.floor(Math.random()*pack.length)];
     view(sleepPanel());
@@ -4499,8 +4592,10 @@ async function infectedNotice(){
 }
 
 /* ---------- Le matin ---------- */
-async function dawn(){
-  const deaths=[];
+async function dawn(resumed){
+  let deaths=[];
+  if(resumed&&Array.isArray(G.dawnDeaths)){deaths=G.dawnDeaths.filter(d=>P(d.id).alive);}
+  else {
   const attack=id=>{
     if(id==null)return;const p=P(id);
     if(!p.alive||deaths.some(d=>d.id===id))return;
@@ -4517,6 +4612,9 @@ async function dawn(){
   if(G.tetanus!=null&&P(G.tetanus).alive&&!deaths.some(d=>d.id===G.tetanus))deaths.push({id:G.tetanus,how:'tetanus'});
   G.tetanus=null;
   for(const d of deaths)if(d.wolves&&P(d.id).role==='chevalier'&&!G.noPowers){const w=leftWolf(d.id);if(w)G.tetanus=w.id;}
+  G.dawnDeaths=deaths;saveLG('dawn');
+  }
+  G.pending=deaths.map(d=>d.id);
   stopAmbient();
   G.phase='day';setPhase();window.scrollTo(0,0);
   chronPhase(`Jour ${G.night}`);
@@ -4531,7 +4629,8 @@ async function dawn(){
     pubLog(`Nuit ${G.night} : personne n'est mort.`);
     chron("Au réveil, personne n'est mort.");
     await say('nodeath');
-  } else for(const d of deaths)await eliminate(d.id,d.how);
+  } else for(const d of deaths){await eliminate(d.id,d.how);saveLG('dawn');}
+  G.pending=null;G.dawnDeaths=null;
   const w=checkWin();if(w)return w;
   const m=holder('montreur');
   if(m&&m.alive&&!G.noPowers){
@@ -4556,7 +4655,10 @@ async function dawn(){
   return null;
 }
 
+// Joueurs vivants qui ne sont pas déjà condamnés cette nuit (morts pas encore annoncés)
+const soonIds=()=>{const l=aliveIds().filter(i=>!(G.pending||[]).includes(i));return l.length?l:aliveIds();};
 async function eliminate(id,how,o={}){
+  if(G.pending)G.pending=G.pending.filter(x=>x!==id);
   const p=P(id);if(!p.alive)return;
   p.alive=false;if(isWolf(p))G.wolfDied=true;setBar();
   const lead={nuit:'lead_nuit',poison:'lead_nuit',vote:'lead_vote',chagrin:'lead_chagrin',balle:'lead_balle',tetanus:'lead_tetanus',bouc:'lead_bouc'}[how];
@@ -4600,7 +4702,7 @@ async function eliminate(id,how,o={}){
   if(G.mayor===id){
     G.mayor=null;
     if(alive().length>1){
-      const pr=act(p,{t:'pick',eyebrow:'Le maire est mort',title:'Qui sera le nouveau maire ?',note:'Sa voix comptera double et il tranchera les égalités.',ids:aliveIds(),confirm:'Désigner'});
+      const pr=act(p,{t:'pick',eyebrow:'Le maire est mort',title:'Qui sera le nouveau maire ?',note:'Sa voix comptera double et il tranchera les égalités.',ids:soonIds(),confirm:'Désigner'});
       await say('maire_mort');
       const s=await pr;
       G.mayor=s;
@@ -4618,7 +4720,7 @@ async function eliminate(id,how,o={}){
 }
 async function hunter(p){
   await explain('r_chasseur');
-  const pr=act(p,{t:'pick',eyebrow:'Dernière balle du chasseur',title:'Qui emportes-tu avec toi ?',ids:aliveIds(),confirm:'Tirer',tone:'wolf'});
+  const pr=act(p,{t:'pick',eyebrow:'Dernière balle du chasseur',title:'Qui emportes-tu avec toi ?',ids:soonIds(),confirm:'Tirer',tone:'wolf'});
   await say('hunter');
   const id=await pr;
   chron(`Le chasseur (${p.name}) tire sur ${P(id).name}.`);
@@ -4794,15 +4896,16 @@ async function applyVerdict(res){
   const sv=alive().find(x=>x.role==='servante'&&x.id!==p.id);
   if(sv&&!G.servanteUsed&&!G.noPowers){
     let r;
-    if(remoteOK(sv)){
-      // La même question s'affiche sur tous les téléphones : seule la réponse de la servante compte.
-      // Sinon, celle qui baisse les yeux vers son téléphone à ce moment-là serait démasquée.
+    if(!G.central.has(sv.id)){
+      // La même question s'affiche sur tous les téléphones, pendant une durée fixe : seule la réponse de la servante compte.
+      // Sinon, celle qui baisse les yeux vers son téléphone (ou qui répond en dernier) serait démasquée.
       const voters=alive().filter(x=>x.id!==p.id&&remoteOK(x));
+      const lover=G.lovers&&G.lovers.includes(sv.id)&&G.lovers.includes(p.id);
       const task={t:'choice',eyebrow:'Servante dévouée',title:`Prendre la place de ${p.name} ?`,note:"Cette question s'affiche sur tous les téléphones. Si tu es la servante dévouée, tu peux te dévoiler et récupérer son rôle (sa carte ne sera pas révélée). Sinon, touche « Ne rien faire ».",opts:[['oui','Me dévoiler et prendre son rôle',''],['non','Ne rien faire','']]};
-      const prs=voters.map(x=>remoteTask(x.id,task).then(v=>{if(x.id===sv.id)r=v;}));
+      voters.forEach(x=>remoteTask(x.id,task).then(v=>{if(x.id===sv.id&&!lover)r=v;}));
       view(`<p class="eyebrow">Servante dévouée</p><h2 class="h">Tout le monde répond sur son téléphone.</h2><p class="note">La servante dévouée peut prendre la place de ${esc(p.name)}.</p>`);
       await say('servante_ask');
-      await Promise.race([Promise.all(prs),wait(20000)]);
+      await wait(12000);
       voters.forEach(x=>cancelTasks(x.id));
       if(r!=='oui')r='non';
     } else {
@@ -4831,11 +4934,13 @@ async function judgeMoment(central){
   view(sleepPanel());
   await say('juge_ask');
   let asked=false;
-  // Le bouton est toujours affiché ; il ne compte que si le juge joue sur ce téléphone (sinon il passe par le sien)
-  view(`<div class="sleep"><p>Les yeux fermés.</p></div>`,`<button class="btn ghost" type="button" data-act="j">${esc(ROLES.juge.name)} : demander un second vote</button>`);
-  const b=$('#main [data-act=j]');
-  if(b)b.onclick=()=>{asked=true;b.disabled=true;b.textContent='Demande enregistrée';};
-  await wait(9000);
+  // Si le juge joue sur ce téléphone (son téléphone a décroché), le bouton est ici ; sinon la demande se fait sur le sien
+  if(central){
+    view(`<div class="sleep"><p>Les yeux fermés.</p></div>`,`<button class="btn ghost" type="button" data-act="j">${esc(ROLES.juge.name)} : demander un second vote</button>`);
+    const b=$('#main [data-act=j]');
+    if(b)b.onclick=()=>{asked=true;b.disabled=true;b.textContent='Demande enregistrée';};
+  } else view(`<div class="sleep"><p>Les yeux fermés.</p><p class="note">${esc(ROLES.juge.name)} : la demande se fait sur ton téléphone, dans « Voir mon rôle ».</p></div>`);
+  await wait(12000);
   if(asked&&central)G.judgeAsk=true;
   view(sleepPanel());
   await say('juge_open');
@@ -4846,7 +4951,7 @@ async function day(){
   await explain('debate');
   if(setup.settings.debate>0){
     const pr=debate();
-    await say('deb_'+setup.settings.debate);
+    if(setup.settings.voice&&actx)await say('deb_'+setup.settings.debate);else await Promise.race([say('deb_'+setup.settings.debate),pr]);
     if(await pr==='time')await say('timeup');
   }
   await applyVerdict(await villageVote(false));
@@ -4867,6 +4972,7 @@ async function day(){
     w=checkWin();if(w)return w;
   }
   G.sus={};
+  saveLG('dusk');
   view(`<p class="eyebrow">Fin du jour ${G.night}</p><h2 class="h">Quand tout le monde est prêt, la nuit peut tomber.</h2><p class="note">Laissez le téléphone au centre de la table.</p>`,
     `<button class="btn" type="button" data-act="n">Faire tomber la nuit</button>`);
   await ask();
@@ -4901,7 +5007,7 @@ async function finish(w){
     ${chronHTML?`<details class="story" open><summary>Récit de la partie</summary>${chronHTML}</details>`:''}`,
     `<button class="btn" type="button" data-act="again">Rejouer avec les mêmes joueurs</button><div class="row"><button class="btn ghost small" type="button" data-act="setup">Changer les rôles</button><button class="btn ghost small" type="button" data-act="home">Tous les jeux</button></div>`);
   const pr=ask();
-  await say('end','win_'+w);
+  if(setup.settings.voice&&actx)await say('end','win_'+w);else await Promise.race([say('end','win_'+w),pr]);
   return await pr;
 }
 
@@ -5055,7 +5161,12 @@ function seatsHTML(){
       <div class="seg"><button type="button" data-act="mode" data-i="${i}" data-v="phone" aria-pressed="${m==='phone'}">Son tél.</button><button type="button" data-act="mode" data-i="${i}" data-v="central" aria-pressed="${m==='central'}">Central</button></div></div>`;
   }).join('');
 }
-function lgActionsHTML(prob){return `${prob?`<p class="warn">${prob}</p>`:''}<button class="btn" type="button" data-act="start" ${prob?'disabled':''}>Distribuer les rôles</button>`;}
+function lgActionsHTML(prob){
+  // Joueurs réglés sur « Son tél. » mais pas encore connectés : ils joueront sur ce téléphone pendant toute la partie
+  const late=!prob&&setup.settings.phones&&NET.on?effectiveNames().filter((_,i)=>seatMode(i)==='phone'&&!seatConnected(i)):[];
+  const lateNote=late.length?`<p class="note">Pas encore connecté${late.length>1?'s':''} : <b>${late.map(esc).join(', ')}</b>. Si ${late.length>1?'ces joueurs ne se connectent':'ce joueur ne se connecte'} pas avant la distribution, ${late.length>1?'ils joueront':'il jouera'} sur ce téléphone central pendant toute la partie (une partie en cours ne peut pas être rejointe).</p>`:'';
+  return `${prob?`<p class="warn">${prob}</p>`:''}${lateNote}<button class="btn" type="button" data-act="start" ${prob?'disabled':''}>Distribuer les rôles</button>`;
+}
 function renderSeats(){if(NET.kind==='uc')return ucRenderSeats();const l=$('#seatList');if(l)l.innerHTML=seatsHTML();const a=$('#lgActions');if(a&&APP==='lg'&&!G)a.innerHTML=lgActionsHTML(problem());}
 function phonesSection(){
   if(!netReady())return '';
@@ -5065,7 +5176,7 @@ function phonesSection(){
     ${on?(NET.on?`<div class="joincode"><span class="eyebrow">Code de la partie</span><span class="code">${esc(NET.code.toUpperCase())}</span></div>
       ${shareBox('lg')}
       <p class="note">${joinHelp()} Un joueur sur « Son tél. » qui n'est pas encore connecté joue ici en attendant.</p>
-      <p class="eyebrow">Qui joue où ?</p><div class="seats" id="seatList">${seatsHTML()}</div>`:`<p class="note">Ouverture de la salle…</p>`):''}
+      <p class="eyebrow">Qui joue où ?</p><div class="seats" id="seatList">${seatsHTML()}</div>`:roomOpening()):''}
   </section>`;
 }
 
@@ -5167,7 +5278,7 @@ function renderSetup(){
     else if(a==='phones'){setup.settings.phones=!setup.settings.phones;persist();if(setup.settings.phones)netStart('lg');else netStop();}
     else if(a==='mode'){const i=+b.dataset.i;setup.modes[i]=b.dataset.v;persist();netPub();}
     else if(a.startsWith('lgs')){const r=seatingAction('lgs',a,+b.dataset.i,lgSeatSel,setup.count,[setup.names,setup.modes]);if(r!==undefined)lgSeatSel=r;}
-    else if(a==='lggload'){const g=loadGroups()[+b.dataset.i];if(g){setup.count=Math.min(24,Math.max(4,g.names.length));setup.names=g.names.slice(0,24);}}
+    else if(a==='lggload'){const g=loadGroups()[+b.dataset.i];if(g&&!seatsLocked()){setup.count=Math.min(24,Math.max(4,g.names.length));setup.names=g.names.slice(0,24);}}
     else if(a==='lggdel'){const gs=loadGroups();gs.splice(+b.dataset.i,1);saveGroups(gs);}
     else if(a==='asplayer'){clientMode();return;}
     else if(a==='rules'){openSheet('rules');return;}
@@ -5211,13 +5322,16 @@ async function clientJoin(raw){
   }catch(e){
     // En version autonome, un simple code ne dit pas de quel jeu il s'agit : on essaie l'autre
     // En version autonome, un simple code ne dit pas de quel jeu il s'agit : on essaie les autres jeux tour à tour
-    if(window.STANDALONE&&(!pre||CL.tryKinds)){const i=KINDS.indexOf(kind);if(i<KINDS.length-1){CL.tryKinds=true;return clientJoin(KINDS[i+1]+'-'+code);}}
+    if(window.STANDALONE&&e==='absent'&&(!pre||CL.tryKinds)){const i=KINDS.indexOf(kind);if(i<KINDS.length-1){CL.tryKinds=true;return clientJoin(KINDS[i+1]+'-'+code);}}
     CL.tryKinds=false;
-    CL.err=e==='absent'||e==='timeout'?"Aucune partie ouverte avec ce code. Vérifie qu'il est bien affiché sur le téléphone central.":"Impossible de rejoindre cette partie. Vérifie le code.";
+    // « absent » : personne n'a ce code ; « timeout » : la partie existe mais la connexion directe échoue (réseaux mobiles)
+    CL.err=e==='absent'?"Aucune partie ouverte avec ce code. Vérifie qu'il est bien affiché sur le téléphone central.":e==='timeout'?"La partie existe, mais la connexion avec le téléphone central n'a pas abouti. Mettez-vous tous sur le même Wi-Fi (la connexion entre téléphones en 4G échoue souvent), puis réessaie.":"Impossible de rejoindre cette partie. Vérifie le code et la connexion internet.";
     renderClient();return;
   }
   CL.err=null;CL.tryKinds=false;
-  CL.gr.on('pub',m=>{if(!m||!m.data||typeof m.data!=='object')return;CL.pub=m.data;ensureKey();renderClient();});
+  CL.gr.on('pub',m=>{if(!m||!m.data||typeof m.data!=='object')return;CL.pub=m.data;ensureKey();
+    const r=CL.remember;if(r&&CL.seat==null&&Array.isArray(m.data.names)){CL.remember=null;if(m.data.names[r.i]===r.name){chooseSeat(r.i);return;}}
+    renderClient();});
   CL.gr.on('sx',async m=>{
     const d=m&&m.data;if(!d||d.s!==CL.seat||!CL.key)return;
     try{const st=await unseal(CL.key,d);if(typeof st.ver!=='number'||st.ver<=CL.ver)return;CL.ver=st.ver;CL.st=st;renderClient();}catch(e){}
@@ -5225,7 +5339,7 @@ async function clientJoin(raw){
   CL.gr.onPeers(()=>renderClient());
   CL.gr.onConnection(()=>renderClient());
   const remembered=store.get('lg-seat-'+code,null);
-  if(Number.isInteger(remembered))chooseSeat(remembered);
+  CL.remember=remembered&&Number.isInteger(remembered.i)&&typeof remembered.name==='string'?remembered:null;
   keepAwake();
   renderClient();
 }
@@ -5237,7 +5351,8 @@ async function ensureKey(){
 }
 function chooseSeat(i){
   CL.seat=i;CL.ver=-1;CL.st=null;
-  store.set('lg-seat-'+CL.code,i);
+  const nm=CL.pub&&Array.isArray(CL.pub.names)?CL.pub.names[i]:null;
+  if(typeof nm==='string')store.set('lg-seat-'+CL.code,{i,name:nm});
   CL.gr.presence({seat:i,pk:CL.pk,a:null}).catch(()=>{});
   renderClient();
 }
@@ -5245,6 +5360,8 @@ async function sendAct(id,v){
   CL.sent[id]=true;renderClient();
   try{const a=await seal(CL.key,{id,v});await CL.gr.presence({a});}catch(e){CL.sent[id]=false;renderClient();}
 }
+// Libérer sa place (mauvais nom choisi)
+function leaveSeat(){CL.seat=null;CL.remember=null;try{localStorage.removeItem('lg-seat-'+CL.code);}catch(e){}CL.gr.presence({seat:null}).catch(()=>{});CL.shown='';renderClient();}
 function myPeer(){const p=CL.gr&&CL.gr.peers().find(x=>x.sameTab);return p?p.peer:null;}
 function clientShow(key,body,actions,wire){
   if(CL.shown===key)return;
@@ -5283,6 +5400,12 @@ function renderClient(){
       ()=>{$('#main').onclick=e=>{const j=e.target.closest('[data-join]');if(j)clientJoin(j.dataset.join);};$('#codeForm').onsubmit=e=>{e.preventDefault();clientJoin($('#codeIn').value);};});
     return;
   }
+  if(pub&&pub.closed){
+    clientShow('closed',`<p class="eyebrow">Partie ${esc((CL.code||'').toUpperCase())}</p><h2 class="h">Le téléphone central a fermé cette partie.</h2><p class="note">S'il en ouvre une autre, rejoins-la avec le nouveau code.</p>`,
+      `<button class="btn" type="button" data-act="rejoin">Rejoindre une autre partie</button>`,
+      ()=>{$('#main').onclick=e=>{if(e.target.closest('[data-act=rejoin]')){try{CL.gr.leave().catch(()=>{});}catch(x){}CL.gr=null;CL.pub=null;CL.seat=null;CL.st=null;CL.shown='';try{history.replaceState(null,'',location.pathname);}catch(x){}renderClient();}};});
+    return;
+  }
   if(!pub){clientShow('wait',`<div class="sleep"><p>Connexion à la partie ${esc((CL.code||'').toUpperCase())}…<br>Le téléphone central doit rester ouvert.</p></div>`);return;}
 
   // 2. Choisir son nom
@@ -5299,23 +5422,27 @@ function renderClient(){
     const taken=owners[CL.seat]&&owners[CL.seat]!==me;
     clientShow('pending:'+taken,`<p class="eyebrow">Partie ${esc(pub.code.toUpperCase())}</p><p class="bigname">${esc(myName)}</p><p class="note">${taken?'Ce nom est déjà utilisé par un autre téléphone.':'Connexion au téléphone central…'}</p>`,
       `<button class="btn ghost" type="button" data-act="change">Changer de nom</button>`,
-      ()=>{$('#main').onclick=e=>{if(e.target.closest('[data-act=change]')){CL.seat=null;CL.gr.presence({seat:null}).catch(()=>{});CL.shown='';renderClient();}};});
+      ()=>{$('#main').onclick=e=>{if(e.target.closest('[data-act=change]'))leaveSeat();};});
     return;
   }
 
   if(Array.isArray(pub.modes)&&pub.modes[CL.seat]==='central'){
     clientShow('central',`<p class="eyebrow">Partie ${esc(pub.code.toUpperCase())}</p><p class="bigname">${esc(myName)}</p><h2 class="h">Tu joues sur le téléphone central.</h2><p class="note">L'organisateur t'a placé sur le téléphone posé au centre de la table : ta carte et tes actions passeront par lui. Tu peux lui demander de te passer sur ton téléphone avant le début de la partie.</p>`,
       `<button class="btn ghost" type="button" data-act="change">Changer de nom</button>`,
-      ()=>{$('#main').onclick=e=>{if(e.target.closest('[data-act=change]')){CL.seat=null;CL.gr.presence({seat:null}).catch(()=>{});CL.shown='';renderClient();}};});
+      ()=>{$('#main').onclick=e=>{if(e.target.closest('[data-act=change]'))leaveSeat();};});
     return;
   }
   // 3. Une action à faire
   const st=CL.st&&CL.st.gid&&CL.st.gid===pub.gid?CL.st:null;
   if(st&&st.task&&!CL.sent[st.task.id]){
-    const key='task:'+JSON.stringify(st.task);
+    // Seule la note a changé (par exemple les votes des autres loups) : on la met à jour sans effacer le choix en cours
+    const key='task:'+JSON.stringify(Object.assign({},st.task,{note:null}));
     if(CL.shown!==key){
       CL.shown=key;CL.showCard=false;clearTimeout(CL.cardT);
       renderTask(st.task,names,v=>sendAct(st.task.id,v));
+    } else {
+      const tn=$('#main .tnotes'),h=[].concat(st.task.note||[]).filter(Boolean).map(x=>`<p class="note">${esc(x)}</p>`).join('');
+      if(tn&&tn.innerHTML!==h)tn.innerHTML=h;
     }
     return;
   }
@@ -5334,6 +5461,7 @@ function renderClient(){
   let body=`<p class="eyebrow">${esc(myName)}</p>`;
   if(!st){
     body+=`<h2 class="h">${pub.gid?'Partie en cours.':'Tu es prêt.'}</h2><p class="note">${pub.gid?'Ton téléphone attend ses informations…':'La partie commencera depuis le téléphone central. Garde cette page ouverte.'}</p>`;
+    if(!pub.gid)body+=`<button class="btn ghost small" type="button" data-act="notme">Ce n'est pas moi · changer de nom</button>`;
   } else {
     const sent=st.task&&CL.sent[st.task.id];
     body+=`<h2 class="h">${sent?'Choix envoyé.':st.alive?(phase==='night'?'Garde les yeux fermés.':'Tu es en vie.'):'Tu es mort.'}</h2>`;
@@ -5362,6 +5490,7 @@ function renderClient(){
   const actions=st?`<button class="btn ${CL.showCard?'ghost':''}" type="button" data-act="card">${CL.showCard?'Cacher mes infos':'Voir mon rôle et mes infos'}</button>`:'';
   clientShow('idle:'+body+actions,body,actions,()=>{$('#main').onclick=e=>{
     if(e.target.closest('[data-act=card]')){toggleCard();}
+    if(e.target.closest('[data-act=notme]')){leaveSeat();return;}
     if(e.target.closest('[data-act=judge]')){CL.judgeSent=true;sendSpecial('judge');renderClient();}
     const sb=e.target.closest('[data-sus]');
     if(sb){const i=+sb.dataset.sus;CL.sus=CL.sus===i?null:i;CL.gr.presence({sus:CL.sus}).catch(()=>{});renderClient();}
@@ -5434,8 +5563,9 @@ function ucCard(role){
   return `<div class="card ${r.cls}"><span class="team">${r.label}</span><div class="glyph">${icon(r.icon,2.2)}</div><h3 class="card-name">${r.name}</h3><p class="card-desc">${r.desc}</p></div>`;
 }
 function ucSame(a,b){
-  const norm=s=>String(s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').trim()
-    .replace(/^(l'|l’|le |la |les |un |une |des |du )/,'').replace(/[^a-z0-9]/g,'').replace(/s$/,'');
+  // œ et æ, accents, articles, pluriels en -s et en -x (ciseaux, jeux, chevaux)
+  const norm=s=>String(s||'').toLowerCase().replace(/œ/g,'oe').replace(/æ/g,'ae').normalize('NFD').replace(/[̀-ͯ]/g,'').trim()
+    .replace(/^(l'|l’|le |la |les |un |une |des |du )/,'').replace(/[^a-z0-9]/g,'').replace(/(eau|eu)x$/,'$1').replace(/aux$/,'al').replace(/s$/,'');
   return !!norm(a)&&norm(a)===norm(b);
 }
 
@@ -5461,7 +5591,7 @@ function ucRenderSetup(){
   const netBox=UCS.mode==='phones'?(NET.on&&NET.kind==='uc'?`<div class="joincode"><span class="eyebrow">Code de la partie</span><span class="code">${esc(NET.code.toUpperCase())}</span></div>
       ${shareBox('uc')}
       <p class="note">${joinHelp()} Pour chacun, choisissez son téléphone ou ce téléphone central.</p>
-      <p class="eyebrow">Qui joue où ?</p><div class="seats" id="ucSeatList">${ucSeatsHTML()}</div>`:`<p class="note">Ouverture de la salle…</p>`):'';
+      <p class="eyebrow">Qui joue où ?</p><div class="seats" id="ucSeatList">${ucSeatsHTML()}</div>`:roomOpening()):'';
   $('#main').onclick=null;
   $('#main').innerHTML=`<div class="body">
     <button class="link" type="button" data-act="home">← Tous les jeux</button>
@@ -5539,7 +5669,7 @@ function ucRenderSetup(){
     else if(a.startsWith('ucs')){const r=seatingAction('ucs',a,+b.dataset.i,ucSeatSel,UCS.count,[UCS.names,UCS.modes]);if(r!==undefined)ucSeatSel=r;}
     else if(a==='speak')UCS.speak=+b.dataset.v;
     else if(a==='mdel')UCS.mine.splice(+b.dataset.i,1);
-    else if(a==='ucgload'){const g=loadGroups()[+b.dataset.i];if(g){UCS.count=Math.min(20,Math.max(3,g.names.length));UCS.names=g.names.slice(0,20);}}
+    else if(a==='ucgload'){const g=loadGroups()[+b.dataset.i];if(g&&!seatsLocked()){UCS.count=Math.min(20,Math.max(3,g.names.length));UCS.names=g.names.slice(0,20);}}
     else if(a==='ucgdel'){const gs=loadGroups();gs.splice(+b.dataset.i,1);saveGroups(gs);}
     else if(a==='rules'){const sh=$('#sheet'),p=$('#sheetPanel');sh.hidden=false;p.innerHTML=rulesHTML('uc')+`<button class="btn" type="button" data-u="close">Fermer</button>`;return;}
     else if(a==='cat'||a==='diff'){
@@ -5564,7 +5694,7 @@ function ucPub(){
 function ucNetInit(){
   if(NET.kind!=='uc')return;
   NET.R={};NET.waiters={};NET.log=[];
-  if(UC)for(const p of UC.players)if(!UC.central.has(p.id))NET.R[p.id]={gid:UC.gid,ver:++NET.ver,word:p.role==='white'?null:p.word,white:p.role==='white',alive:true,task:null};
+  if(UC)for(const p of UC.players)if(!UC.central.has(p.id))NET.R[p.id]={gid:UC.gid,ver:++NET.ver,word:p.role==='white'?null:p.word,white:p.role==='white',alive:p.alive,task:null};
   for(const s of Object.keys(NET.owners))sendState(+s);
   ucPub();
 }
@@ -5585,8 +5715,31 @@ const ucAlive=()=>UC.players.filter(p=>p.alive);
 function setUCBar(){
   const b=$('#bar');b.hidden=false;b.dataset.h='';
   const label=UC.phase==='deal'?'Les mots':UC.phase==='end'?'Fin de partie':`Tour ${UC.round}`;
-  b.innerHTML=`<span class="phase">${label}</span><span class="meta">· ${ucAlive().length} en jeu</span><span class="spacer"></span><button class="btn small ghost" id="ucQuit" type="button">Quitter</button>`;
+  const central=UC.players.filter(p=>!ucRemoteOK(p));
+  b.innerHTML=`<span class="phase">${label}</span><span class="meta">· ${ucAlive().length} en jeu</span><span class="spacer"></span>${UC.phase!=='deal'&&UC.phase!=='end'&&central.length?`<button class="btn small ghost" id="ucCardBtn" type="button">Mon mot</button>`:''}<button class="btn small ghost" id="ucQuit" type="button">Quitter</button>`;
 }
+// Revoir son mot sur le téléphone central (trou de mémoire) : on choisit son nom, on confirme, le mot s'affiche
+function ucCardSheet(id,reveal){
+  const s=$('#sheet'),p=$('#sheetPanel');s.hidden=false;
+  if(id==null){
+    const central=UC.players.filter(q=>!ucRemoteOK(q));
+    p.innerHTML=`<p class="eyebrow">Mon mot</p><h2 class="h">Qui es-tu ?</h2><p class="note">Les autres détournent le regard.</p>
+      <div class="tiles">${central.map(q=>`<button class="tile" type="button" data-ucwho="${q.id}"><span>${esc(q.name)}</span></button>`).join('')}</div>
+      <button class="btn ghost" type="button" data-u="close">Annuler</button>`;
+  } else if(!reveal){
+    p.innerHTML=`<p class="eyebrow">Mon mot</p><h2 class="h">${esc(UP(id).name)}, c'est bien toi ?</h2><p class="note">Ton mot va s'afficher.</p>
+      <button class="btn" type="button" data-ucshow="${id}">Oui, afficher mon mot</button><button class="btn ghost" type="button" data-u="close">Annuler</button>`;
+  } else {
+    const q=UP(id);
+    p.innerHTML=`<p class="eyebrow">${esc(q.name)}</p><div class="wordbox"><span class="eyebrow">Ta carte</span><b>${esc(q.role==='white'?'Mr White':q.word)}</b></div><button class="btn" type="button" data-u="close">Cacher</button><i hidden data-ucac="1"></i>`;
+    setTimeout(()=>{if(p.querySelector('[data-ucac]')&&!s.hidden)s.hidden=true;},20000);
+  }
+}
+document.addEventListener('click',e=>{
+  if(e.target.closest('#ucCardBtn')){ucCardSheet(null);return;}
+  const w=e.target.closest('[data-ucwho]');if(w){ucCardSheet(+w.dataset.ucwho,false);return;}
+  const sh=e.target.closest('[data-ucshow]');if(sh){ucCardSheet(+sh.dataset.ucshow,true);return;}
+});
 document.addEventListener('click',e=>{
   if(e.target.closest('#ucQuit')){
     const s=$('#sheet'),p=$('#sheetPanel');s.hidden=false;
@@ -5594,7 +5747,7 @@ document.addEventListener('click',e=>{
       <button class="btn wolf" type="button" data-u="stop">Oui, arrêter</button><button class="btn ghost" type="button" data-u="close">Continuer la partie</button>`;
   }
   const u=e.target.closest('[data-u]');
-  if(u){$('#sheet').hidden=true;if(u.dataset.u==='stop')ucStop();if(u.dataset.u==='clearstats'){store.set(STATS_KEY,{});}}
+  if(u){$('#sheet').hidden=true;if(u.dataset.u==='stop')ucStop();if(u.dataset.u==='clearstats'){const s=$('#sheet'),p=$('#sheetPanel');s.hidden=false;p.innerHTML=`<h2 class="h">Effacer les statistiques ?</h2><p class="note">Victoires et parties jouées de tous les joueurs seront perdues.</p><button class="btn wolf" type="button" data-u="clearstatsok">Oui, effacer</button><button class="btn ghost" type="button" data-u="close">Annuler</button>`;}if(u.dataset.u==='clearstatsok'){store.set(STATS_KEY,{});}if(u.dataset.u==='resetscoresok'){store.set(SCORES_KEY,{t:Date.now(),players:{},games:0});if(APP==='home')renderHome();}}
 });
 function ucStop(){abortGame();UC=null;clearUCSave();ucNetInit();ucRenderSetup();window.scrollTo(0,0);}
 
@@ -5657,8 +5810,8 @@ async function ucResumeScreen(){
 
 function ucWordTask(p){
   return p.role==='white'
-    ?{t:'info',eyebrow:`${p.name}, ta carte`,big:'Mr White',note:["Tu n'as pas de mot : écoute les autres et devine le leur.","Éliminé, tu pourras encore gagner en le devinant."],btn:"C'est noté"}
-    :{t:'info',eyebrow:`${p.name}, ta carte`,big:p.word,note:["Retiens ton mot et ne le montre à personne.","Civil ou undercover ? Écoute bien les autres."],btn:"C'est noté"};
+    ?{t:'info',eyebrow:`${p.name}, ta carte`,big:'Mr White',note:["Tu n'as pas de mot : écoute les autres et devine le leur.","Éliminé, tu pourras encore gagner en le devinant."],howto:HOWTO_UC,btn:"C'est noté"}
+    :{t:'info',eyebrow:`${p.name}, ta carte`,big:p.word,note:["Retiens ton mot et ne le montre à personne.","Civil ou undercover ? Écoute bien les autres."],howto:HOWTO_UC,btn:"C'est noté"};
 }
 async function ucDeal(){
   const rem=UC.players.filter(ucRemoteOK),seen=new Set();
@@ -5672,7 +5825,7 @@ async function ucDeal(){
     await ucTask(ucWordTask(p));
   }
   if(rem.length){
-    progress=()=>{const l=$('#dealList');if(l)l.innerHTML=rem.map(p=>`<span class="pill ${seen.has(p.id)?'':'off'}">${esc(p.name)}${seen.has(p.id)?' ✓':''}</span>`).join('');};
+    progress=()=>{const l=$('#dealList');if(l)l.innerHTML=`<p class="note" style="text-align:center">${seen.size} carte${seen.size>1?'s':''} lue${seen.size>1?'s':''} sur ${rem.length}.</p>`;};
     view(`<p class="eyebrow">Les mots</p><h2 class="h">Chacun découvre son mot sur son téléphone.</h2><div class="namelist" id="dealList"></div>`,
       `<button class="btn ghost" type="button" data-act="skip">Continuer sans attendre</button>`);
     progress();
@@ -5841,11 +5994,12 @@ function ucClientIdle(pub,st,myName,names){
   let body=`<p class="eyebrow">${esc(myName)}</p>`;
   if(!st){
     body+=`<h2 class="h">${pub.gid?'Partie en cours.':'Tu es prêt.'}</h2><p class="note">${pub.gid?'Ton téléphone attend ton mot…':'La partie commencera depuis le téléphone central. Garde cette page ouverte.'}</p>`;
+    if(!pub.gid)body+=`<button class="btn ghost small" type="button" data-act="notme">Ce n'est pas moi · changer de nom</button>`;
   } else {
     const sent=st.task&&CL.sent[st.task.id];
     body+=`<h2 class="h">${sent?'Vote envoyé.':!st.alive?'Tu es éliminé.':pub.phase==='vote'?'Vote en cours…':pub.phase==='end'?'Partie terminée.':'Tu es en jeu.'}</h2>`;
-    if(CL.showCard)body+=st.white?`<div class="wordbox"><span class="eyebrow">Ta carte</span><b>Mr White</b></div>`
-      :`<div class="wordbox"><span class="eyebrow">Ta carte</span><b>${esc(st.word)}</b></div>`;
+    if(CL.showCard)body+=st.white?`<div class="wordbox"><span class="eyebrow">Ta carte</span><b>Mr White</b></div>${howtoBox(HOWTO_UC)}`
+      :`<div class="wordbox"><span class="eyebrow">Ta carte</span><b>${esc(st.word)}</b></div>${howtoBox(HOWTO_UC)}`;
   }
   if(pub.phase==='talk'&&Array.isArray(pub.order)&&pub.order.length){const cur=pub.order.indexOf(pub.speaker);body+=`<p class="eyebrow">Ordre de parole</p><ol class="order">${pub.order.map((i,j)=>`<li class="${cur>=0&&j<cur?'done':j===cur?'cur':''}">${esc(names[i]==null?'?':names[i])}${j===cur&&i===CL.seat?' · à toi !':''}</li>`).join('')}</ol>`;}
   if(pub.final&&typeof pub.final==='object'){
@@ -5857,7 +6011,7 @@ function ucClientIdle(pub,st,myName,names){
     if(log.length)body+=`<p class="eyebrow">Dans la partie</p>${log.slice().reverse().map(x=>`<p class="note">${esc(x)}</p>`).join('')}`;
   }
   const actions=st&&!pub.final?`<button class="btn ${CL.showCard?'ghost':''}" type="button" data-act="card">${CL.showCard?'Cacher mon mot':'Voir mon mot'}</button>`:'';
-  clientShow('ucidle:'+body+actions,body,actions,()=>{$('#main').onclick=e=>{if(e.target.closest('[data-act=card]')){toggleCard();}};});
+  clientShow('ucidle:'+body+actions,body,actions,()=>{$('#main').onclick=e=>{if(e.target.closest('[data-act=card]')){toggleCard();}if(e.target.closest('[data-act=notme]')){leaveSeat();return;}};});
 }
 
 
@@ -5946,7 +6100,7 @@ function xRenderSetup(k){
   if(S.mode==='phones'&&!phonesOK)S.mode='single';
   const netBox=S.mode==='phones'?(NET.on&&NET.kind===k?`<div class="joincode"><span class="eyebrow">Code de la partie</span><span class="code">${esc(NET.code.toUpperCase())}</span></div>
       ${shareBox(k)}<p class="note">${joinHelp()} Pour chacun, choisissez son téléphone ou ce téléphone central.</p>
-      <p class="eyebrow">Qui joue où ?</p><div class="seats" id="xSeatList">${xSeatsHTML(k)}</div>`:`<p class="note">Ouverture de la salle…</p>`):'';
+      <p class="eyebrow">Qui joue où ?</p><div class="seats" id="xSeatList">${xSeatsHTML(k)}</div>`:roomOpening()):'';
   const intro=k==='sp'
     ?{lead:"Tout le monde connaît le lieu secret, sauf l'espion. Questionnez-vous pour le démasquer… sans trop en dire.",how:[
       ['La carte.',"Chacun découvre en secret le lieu et son rôle sur place. L'espion, lui, voit seulement la liste des lieux possibles."],
@@ -5999,7 +6153,7 @@ function xRenderSetup(k){
     else if(a==='n+'){S.count=Math.min(D.max,S.count+1);xSeatSel=null;}
     else if(a==='mode'){S.mode=b.dataset.v;if(S.mode==='phones')netStart(k);else netStop();}
     else if(a.startsWith('xs')){const r=seatingAction('xs',a,+b.dataset.i,xSeatSel,S.count,[S.names,S.modes]);if(r!==undefined)xSeatSel=r;}
-    else if(a==='xgload'){const g=loadGroups()[+b.dataset.i];if(g){S.count=Math.min(D.max,Math.max(D.min,g.names.length));S.names=g.names.slice(0,D.max);}}
+    else if(a==='xgload'){const g=loadGroups()[+b.dataset.i];if(g&&!seatsLocked()){S.count=Math.min(D.max,Math.max(D.min,g.names.length));S.names=g.names.slice(0,D.max);}}
     else if(a==='xgdel'){const gs=loadGroups();gs.splice(+b.dataset.i,1);saveGroups(gs);}
     else if(a==='opt'){const o=b.dataset.k;S.opt[o]=b.dataset.v!=null?+b.dataset.v:!S.opt[o];if(k==='mi')miFixOpts();}
     rer();
@@ -6051,11 +6205,11 @@ function xCardSheet(id,reveal){
 function xCardHTML(c){
   if(!c)return '';
   if(c.game==='sp'){
-    if(c.spy)return `<div class="card"><span class="team">Ta carte</span><div class="glyph">${icon('mask',2.2)}</div><h3 class="card-name">Espion</h3><p class="card-desc">Tu ne connais pas le lieu : écoute les autres et devine-le.</p></div>`;
-    return `<div class="card"><span class="team">Ta carte</span><div class="glyph">${icon('mask',2.2)}</div><h3 class="card-name">${esc(c.loc)}</h3><p class="card-desc">Ton rôle sur place : <b>${esc(c.role)}</b>.</p></div>`;
+    if(c.spy)return `<div class="card neutral"><span class="team">Ta carte</span><div class="glyph">${icon('mask',2.2)}</div><h3 class="card-name">Espion</h3><p class="card-desc">Tu ne connais pas le lieu : écoute les autres et devine-le.</p>${howtoBox(HOWTO_SP)}</div>`;
+    return `<div class="card neutral"><span class="team">Ta carte</span><div class="glyph">${icon('mask',2.2)}</div><h3 class="card-name">${esc(c.loc)}</h3><p class="card-desc">Ton rôle sur place : <b>${esc(c.role)}</b>.</p>${howtoBox(HOWTO_SP)}</div>`;
   }
   const r=MI_ROLES[c.role]||MI_ROLES.resistant;
-  return `<div class="card"><span class="team">${r.team==='traitre'?'Les traîtres':'La résistance'}</span><div class="glyph">${icon(r.icon,2.2)}</div><h3 class="card-name">${r.name}</h3><p class="card-desc">${r.desc}</p></div>
+  return `<div class="card neutral"><span class="team">${r.team==='traitre'?'Les traîtres':'La résistance'}</span><div class="glyph">${icon(r.icon,2.2)}</div><h3 class="card-name">${r.name}</h3><p class="card-desc">${r.desc}</p>${howtoBox(HOWTO_MI)}</div>
     ${(c.know||[]).map(x=>`<p class="note" style="text-align:center"><b>${esc(x)}</b></p>`).join('')}`;
 }
 // La liste des lieux possibles est affichée pour tout le monde (comme le plateau du jeu de société) :
@@ -6083,7 +6237,7 @@ async function xDeal(){
     await xTask(task(p));
   }
   if(rem.length){
-    progress=()=>{const l=$('#dealList');if(l)l.innerHTML=rem.map(p=>`<span class="pill ${seen.has(p.id)?'':'off'}">${esc(p.name)}${seen.has(p.id)?' ✓':''}</span>`).join('');};
+    progress=()=>{const l=$('#dealList');if(l)l.innerHTML=`<p class="note" style="text-align:center">${seen.size} carte${seen.size>1?'s':''} lue${seen.size>1?'s':''} sur ${rem.length}.</p>`;};
     view(`<p class="eyebrow">Les cartes</p><h2 class="h">Chacun découvre sa carte sur son téléphone.</h2><div class="namelist" id="dealList"></div>`,
       `<button class="btn ghost" type="button" data-act="skip">Continuer sans attendre</button>`);
     progress();
@@ -6100,7 +6254,7 @@ async function xCollect(voters,taskFn,eyebrow){
     if(!onBoard)return;
     const k=Object.keys(votes).length;
     view(`<p class="eyebrow">${esc(eyebrow)}</p><h2 class="h">Chacun choisit sur son téléphone.</h2>
-      <div class="namelist">${voters.map(v=>`<span class="pill ${v.id in votes?'':'off'}">${esc(v.name)}${v.id in votes?' ✓':''}</span>`).join('')}</div><p class="note">${k} sur ${voters.length}.</p>`,
+      <p class="note" style="text-align:center">${k} sur ${voters.length}.</p>`,
       `<button class="btn ghost" type="button" id="closeVote">Clore maintenant</button>`);
     const b=$('#closeVote');if(b)b.onclick=()=>closeRes&&closeRes();
   };
@@ -6123,13 +6277,12 @@ async function xRun(resumed){
     const w=XG.kind==='sp'?await spRound():await miLoop();
     next=await (XG.kind==='sp'?spFinish(w):miFinish(w));
   }catch(e){if(e!==ABORT)console.error(e);return;}
-  clearXSave();
-  const k=XG.kind;
+  const k=XG.kind;clearXSave(k);
   if(next==='again')(k==='sp'?spStart:miStart)();
   else if(next==='home'){XG=null;xNetInit();renderHome();}
   else{XG=null;xNetInit();xRenderSetup(k);window.scrollTo(0,0);}
 }
-function xStop(){abortGame();const k=XG?XG.kind:APP;XG=null;clearXSave();xNetInit();xRenderSetup(k);window.scrollTo(0,0);}
+function xStop(){abortGame();const k=XG?XG.kind:APP;XG=null;clearXSave(k);xNetInit();xRenderSetup(k);window.scrollTo(0,0);}
 function xNewGame(kind,players,extra){
   abortGame();
   const S=XS[kind];
@@ -6141,12 +6294,17 @@ function xNewGame(kind,players,extra){
   xRun(false);
 }
 /* Sauvegarde : la partie reprend au début de l'étape en cours si la page se recharge */
-const X_SAVE='x-save';
-function saveX(){if(!XG)return;try{const g=Object.assign({},XG,{central:[...XG.central],signal:null});store.set(X_SAVE,{v:1,t:Date.now(),mode:XS[XG.kind].mode,XG:g});}catch(e){}}
-const clearXSave=()=>{try{localStorage.removeItem(X_SAVE);}catch(e){}};
-function loadXSave(){const s=store.get(X_SAVE,null);if(!s||s.v!==1||!s.XG||!isX(s.XG.kind)||Date.now()-s.t>12*3600e3)return null;return s;}
-function resumeX(){
-  const s=loadXSave();if(!s)return;
+// Une sauvegarde par jeu : lancer L'Espion n'efface plus une partie de Missions en cours (et inversement)
+const X_SAVE='x-save',xSaveKey=k=>X_SAVE+'-'+k;
+function saveX(){if(!XG)return;try{const g=Object.assign({},XG,{central:[...XG.central],signal:null});store.set(xSaveKey(XG.kind),{v:1,t:Date.now(),mode:XS[XG.kind].mode,XG:g});}catch(e){}}
+const clearXSave=k=>{k=k||(XG&&XG.kind);try{if(k)localStorage.removeItem(xSaveKey(k));localStorage.removeItem(X_SAVE);}catch(e){}};
+function loadXSave(k){
+  const ok=s=>s&&s.v===1&&s.XG&&isX(s.XG.kind)&&Date.now()-s.t<=12*3600e3?s:null;
+  if(k)return ok(store.get(xSaveKey(k),null))||(ok(store.get(X_SAVE,null))&&store.get(X_SAVE,null).XG.kind===k?store.get(X_SAVE,null):null);
+  return ['sp','mi'].map(x=>loadXSave(x)).filter(Boolean).sort((a,b)=>b.t-a.t)[0]||null;
+}
+function resumeX(want){
+  const s=loadXSave(want);if(!s)return;
   abortGame();
   XG=Object.assign(s.XG,{central:new Set(s.XG.central||[])});
   const k=XG.kind;XS[k].mode=s.mode;APP=k;CL.on=false;applyTheme(null,null);
@@ -6221,7 +6379,8 @@ function spStart(){
   const spy=Math.floor(Math.random()*n);
   const players=names.map((name,i)=>({id:i,name,role:i===spy?'espion':roles[i]}));
   const minutes=XS.sp.opt.minutes||8;
-  xNewGame('sp',players,{loc:L[0],spy,left:minutes*60,first:Math.floor(Math.random()*n),accused:[],round:1});
+  XS.sp.played=(XS.sp.played||0)+1;
+  xNewGame('sp',players,{loc:L[0],spy,left:minutes*60,first:Math.floor(Math.random()*n),accused:[],round:XS.sp.played});
 }
 // La manche : questions chronométrées, jusqu'à une accusation, l'espion qui se dévoile, ou la fin du temps
 async function spRound(){
@@ -6240,7 +6399,7 @@ function spTalk(){
   return track((res,h)=>{
     const fmt=s=>`${Math.floor(s/60)}:${String(Math.max(0,s)%60).padStart(2,'0')}`;
     let iv=null;
-    const done=v=>{clearInterval(iv);XG.signal=null;$('#main').onclick=null;saveX();res(v);};
+    const done=v=>{clearInterval(iv);XG.signal=null;$('#main').onclick=null;$('#sheet').hidden=true;saveX();res(v);};
     h.cleanup=()=>{clearInterval(iv);XG.signal=null;};
     XG.signal=v=>done(v);
     const can=XG.players.filter(p=>!XG.accused.includes(p.id));
@@ -6261,7 +6420,7 @@ function spTalk(){
     iv=setInterval(()=>{
       XG.left--;const c=$('#spclock');
       if(c){c.textContent=fmt(XG.left);c.classList.toggle('low',XG.left<=30);}
-      if(XG.left%5===0)xPub();
+      if(XG.left%5===0){xPub();saveX();}
       if(XG.left===30)chime('night');
       if(XG.left<=0){chime('day');done('time');}
     },1000);
@@ -6344,7 +6503,7 @@ async function spReveal(id){
 }
 function spFlip(p,open){
   const front=p.id===XG.spy?`<div class="card wolf"><span class="team">Démasqué</span><div class="glyph">${icon('mask',2.2)}</div><h3 class="card-name">Espion</h3></div>`
-    :`<div class="card"><span class="team">${esc(XG.loc)}</span><div class="glyph">${icon('house',2.2)}</div><h3 class="card-name">${esc(p.role)}</h3></div>`;
+    :`<div class="card neutral"><span class="team">${esc(XG.loc)}</span><div class="glyph">${icon('house',2.2)}</div><h3 class="card-name">${esc(p.role)}</h3></div>`;
   return `<div class="flip ${open?'on':''}" id="flip"><div class="flip-inner"><div class="flip-face flip-back"><div class="card back"><span class="team">Qui était-ce ?</span><div class="glyph">${icon('eye',2.2)}</div><h3 class="card-name">?</h3></div></div><div class="flip-face flip-front">${front}</div></div></div>`;
 }
 async function spFinish(r){
@@ -6565,18 +6724,21 @@ function xRulesHTML(k){
 /* ---------- Téléphone d'un joueur ---------- */
 function xClientIdle(pub,st,myName,names){
   const k=pub.game;
+  if(CL.crossGid!==pub.gid){CL.crossGid=pub.gid;CL.cross=new Set();}
   let body=`<p class="eyebrow">${esc(myName)}</p>`;
   if(!st){
     body+=`<h2 class="h">${pub.gid?'Partie en cours.':'Tu es prêt.'}</h2><p class="note">${pub.gid?'Ton téléphone attend ta carte…':'La partie commencera depuis le téléphone central. Garde cette page ouverte.'}</p>`;
+    if(!pub.gid)body+=`<button class="btn ghost small" type="button" data-act="notme">Ce n'est pas moi · changer de nom</button>`;
   } else {
     const sent=st.task&&CL.sent[st.task.id];
     const ph={talk:'Questions en cours.',accuse:'Accusation en cours…',vote:'Vote en cours…',guess:"L'espion devine…",reveal:'Révélation…',team:'Le chef compose son équipe.',mission:'Mission en cours…',assassin:"L'assassin cherche Merlin…",end:'Partie terminée.'}[pub.phase]||'Partie en cours.';
     body+=`<h2 class="h">${sent?'Choix envoyé.':ph}</h2>`;
-    if(k==='sp'&&typeof pub.left==='number'&&pub.phase==='talk')body+=`<div class="clock small">${Math.floor(pub.left/60)}:${String(Math.max(0,pub.left)%60).padStart(2,'0')}</div>`;
+    // Le chrono est mis à jour à part : sinon tout l'écran se redessinerait à chaque seconde envoyée
+    if(k==='sp'&&typeof pub.left==='number'&&pub.phase==='talk')body+=`<div class="clock small" id="clClock"></div>`;
     if(CL.showCard)body+=xCardHTML(st.card);
     if(k==='sp'&&st.card&&!pub.final&&pub.phase==='talk')body+=spLocsHTML(true);
     // Le même bouton pour tous : seul celui de l'espion déclenche quelque chose
-    if(k==='sp'&&st.card&&!pub.final&&!['guess','reveal'].includes(pub.phase))body+=`<button class="btn ghost" type="button" data-act="spyout">L'espion se dévoile (si c'est toi)</button>`;
+    if(k==='sp'&&st.card&&!pub.final&&pub.phase==='talk')body+=`<button class="btn ghost" type="button" data-act="spyout">L'espion se dévoile (si c'est toi)</button>`;
   }
   if(k==='mi'&&pub.board){
     const b=pub.board;
@@ -6592,10 +6754,11 @@ function xClientIdle(pub,st,myName,names){
   }
   const actions=st&&!pub.final?`<button class="btn ${CL.showCard?'ghost':''}" type="button" data-act="card">${CL.showCard?'Cacher ma carte':'Voir ma carte'}</button>`:'';
   clientShow('xidle:'+body+actions,body,actions,()=>{$('#main').onclick=e=>{
-    if(e.target.closest('[data-act=card]')){toggleCard();}
+    if(e.target.closest('[data-act=card]')){toggleCard();}if(e.target.closest('[data-act=notme]')){leaveSeat();return;}
     const so=e.target.closest('[data-act=spyout]');
     if(so){if(so.dataset.sure){if(CL.st&&CL.st.card&&CL.st.card.spy){sendSpecial('spy');so.textContent='Demande envoyée';}else so.textContent="Tu n'es pas l'espion.";so.disabled=true;}else{so.dataset.sure='1';so.textContent='Confirmer : je suis l\'espion';}}
   };});
+  const clk=$('#clClock');if(clk&&typeof pub.left==='number')clk.textContent=`${Math.floor(Math.max(0,pub.left)/60)}:${String(Math.max(0,pub.left)%60).padStart(2,'0')}`;
 }
 
 /* ================= Démineur (jeu solo, proposé par Lili) =================
@@ -6657,7 +6820,7 @@ function msNew(){
   const L=MS_LEVELS[MSP.lvl];
   clearInterval(msTimer);msTimer=null;
   MS={theme:MSP.theme,lvl:MSP.lvl,c:L.c,r:L.r,m:L.m,n:L.c*L.r,mine:null,adj:null,open:new Uint8Array(L.c*L.r),flag:new Uint8Array(L.c*L.r),
-    opened:0,flags:0,started:false,over:false,won:false,boom:-1,t0:0,elapsed:0,mode:MS?MS.mode:'dig',face:'idle',record:false};
+    opened:0,flags:0,started:false,over:false,won:false,boom:-1,t0:0,elapsed:0,mode:'dig',face:'idle',record:false,theme0:MSP.theme};
 }
 function msNb(i){
   const c=MS.c,r=MS.r,x=i%c,y=(i/c)|0,o=[];
@@ -6718,7 +6881,7 @@ function msLose(i){
 function msWin(){
   msStop();MS.won=true;MS.face='win';
   for(let i=0;i<MS.n;i++)if(MS.mine[i]&&!MS.flag[i]){MS.flag[i]=1;MS.flags++;}
-  const best=store.get(MS_BEST,{}),k=MS.theme+'|'+MS.lvl,t=MS.elapsed;
+  const best=store.get(MS_BEST,{}),k=(MS.theme0||MS.theme)+'|'+MS.lvl,t=MS.elapsed;
   if(!best[k]||t<best[k]){best[k]=t;store.set(MS_BEST,best);MS.record=true;}
 }
 const msSec=ms=>{const s=ms/1000;return s<60?`${s.toFixed(1).replace('.',',')} s`:`${Math.floor(s/60)} min ${String(Math.floor(s%60)).padStart(2,'0')} s`;};
@@ -6789,7 +6952,7 @@ function msWire(){
     if(a==='home'){clearInterval(msTimer);msTimer=null;renderHome();}
     else if(a==='msnew'){msNew();msRender();}
     else if(a==='mstheme'){MSP.theme=b.dataset.v;store.set(MS_KEY,MSP);if(MS.started&&!MS.over){MS.theme=MSP.theme;msRender();}else{msNew();msRender();}}
-    else if(a==='mslvl'){MSP.lvl=+b.dataset.v;store.set(MS_KEY,MSP);msNew();msRender();}
+    else if(a==='mslvl'){if(+b.dataset.v===MS.lvl&&!MS.over)return;MSP.lvl=+b.dataset.v;store.set(MS_KEY,MSP);msNew();msRender();}
     else if(a==='msmode'){MS.mode=b.dataset.v;$('#msMode').innerHTML=msModeHTML();}
   };
   const board=$('#msBoard');
@@ -6974,10 +7137,12 @@ function renderHome(){
   if(NET.on)netStop();
   document.documentElement.dataset.phase='night';
   $('#bar').hidden=true;$('#bar').dataset.h='';$('#narr').hidden=true;
-  const lgs=loadLGSave(),ucs=loadUCSave(),xs=loadXSave();
-  const resume=lgs?`<div class="resume"><div><p class="eyebrow">Partie interrompue</p><b>Loups-garous · ${lgs.stage==='day'?'jour':'nuit'} ${lgs.stage==='day'?lgs.G.night:lgs.G.night+1}</b></div><div class="row"><button class="btn small" type="button" data-act="resumelg">Reprendre</button><button class="btn small ghost" type="button" data-act="droplg">Abandonner</button></div></div>`
+  const lgs=loadLGSave(),ucs=loadUCSave();
+  // Une bannière par partie interrompue
+  const xres=['sp','mi'].map(k=>loadXSave(k)).filter(Boolean).map(xs=>`<div class="resume"><div><p class="eyebrow">Partie interrompue</p><b>${XDEF[xs.XG.kind].title}</b></div><div class="row"><button class="btn small" type="button" data-act="resumex" data-k="${xs.XG.kind}">Reprendre</button><button class="btn small ghost" type="button" data-act="dropx" data-k="${xs.XG.kind}">Abandonner</button></div></div>`).join('');
+  const resume=(lgs?`<div class="resume"><div><p class="eyebrow">Partie interrompue</p><b>Loups-garous · ${lgs.stage==='day'||lgs.stage==='dawn'?'jour':'nuit'} ${lgs.stage==='day'||lgs.stage==='dawn'?lgs.G.night:lgs.G.night+1}</b></div><div class="row"><button class="btn small" type="button" data-act="resumelg">Reprendre</button><button class="btn small ghost" type="button" data-act="droplg">Abandonner</button></div></div>`
     :ucs?`<div class="resume"><div><p class="eyebrow">Partie interrompue</p><b>Undercover · tour ${ucs.UC.round+1}</b></div><div class="row"><button class="btn small" type="button" data-act="resumeuc">Reprendre</button><button class="btn small ghost" type="button" data-act="dropuc">Abandonner</button></div></div>`
-    :xs?`<div class="resume"><div><p class="eyebrow">Partie interrompue</p><b>${XDEF[xs.XG.kind].title}</b></div><div class="row"><button class="btn small" type="button" data-act="resumex">Reprendre</button><button class="btn small ghost" type="button" data-act="dropx">Abandonner</button></div></div>`:'';
+    :'')+(lgs&&ucs?`<div class="resume"><div><p class="eyebrow">Partie interrompue</p><b>Undercover · tour ${ucs.UC.round+1}</b></div><div class="row"><button class="btn small" type="button" data-act="resumeuc">Reprendre</button><button class="btn small ghost" type="button" data-act="dropuc">Abandonner</button></div></div>`:'')+xres;
   view(`<header class="hero">${moonSVG(1,80)}<h1 class="title">Jeux entre copains</h1></header>
     ${resume}
     <div class="games">
@@ -6993,11 +7158,11 @@ function renderHome(){
   $('#main').onclick=e=>{
     const a=e.target.closest('[data-act]')?.dataset.act;
     if(a==='lg')goLG();else if(a==='uc')goUC();else if(a==='sp'||a==='mi')xGo(a);else if(a==='bn'){if(NET.on)netStop();location.href='touche-coule.html';}else if(a==='ms')goMS();else if(a==='asplayer')clientMode();
-    else if(a==='resumex')resumeX();else if(a==='dropx'){clearXSave();renderHome();}
+    else if(a==='resumex')resumeX(e.target.closest('[data-act]').dataset.k);else if(a==='dropx'){clearXSave(e.target.closest('[data-act]').dataset.k);renderHome();}
     else if(a==='resumelg')resumeLG();else if(a==='resumeuc')resumeUC();
     else if(a==='droplg'){clearLGSave();renderHome();}else if(a==='dropuc'){clearUCSave();renderHome();}
     else if(a==='stats'){const s=$('#sheet'),p=$('#sheetPanel');s.hidden=false;p.innerHTML=statsHTML()+`<button class="btn" type="button" data-u="close">Fermer</button>`;}
-    else if(a==='resetscores'){store.set(SCORES_KEY,{t:Date.now(),players:{},games:0});renderHome();}
+    else if(a==='resetscores'){const s=$('#sheet'),p=$('#sheetPanel');s.hidden=false;p.innerHTML=`<h2 class="h">Commencer une nouvelle soirée ?</h2><p class="note">Le classement de la soirée sera remis à zéro. Les statistiques sont conservées.</p><button class="btn wolf" type="button" data-u="resetscoresok">Oui, remettre à zéro</button><button class="btn ghost" type="button" data-u="close">Annuler</button>`;}
   };
 }
 /* ---------- Démarrage ---------- */
