@@ -483,6 +483,11 @@ html.big .btn{font-size:20px;min-height:62px}
 .msmsg.lose{border-color:var(--wolf);background:color-mix(in srgb,var(--wolf) 12%,transparent)}
 .rrow.locked{opacity:.55}
 .rrow .lockn{display:block;font-style:normal;color:var(--accent);font-size:13px;margin-top:2px}
+.clnight .btn.wolf{background:var(--accent);color:var(--on-accent)}
+.clnight .eyebrow.wolf{color:var(--muted)}
+.locs{border:1.5px solid var(--line);border-radius:12px;padding:10px 12px}
+.locs summary{cursor:pointer;font-weight:700}
+.locs .loclist{margin-top:10px}
 </style><style>[hidden]{display:none!important}:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}img{max-width:100%}</style>
 </head>
 <body>
@@ -3203,10 +3208,15 @@ function say(...keys){
     h.cleanup=()=>{b.hidden=true;b.onclick=null;};
   });
 }
+// Un double appui ne doit pas ouvrir l'écran suivant (la carte du joueur suivant, par exemple) : on ignore
+// les touches dans les 400 ms qui suivent un changement d'écran.
+let VIEW_T=0;
 function view(body,actions=''){
   const m=$('#main');m.onclick=null;
   m.innerHTML=`<div class="body">${body}</div><div class="actions">${actions}</div>`;
+  VIEW_T=Date.now();
 }
+document.addEventListener('click',e=>{if(!window.NO_TAP_GUARD&&Date.now()-VIEW_T<400&&e.target.closest&&e.target.closest('#main button')){e.stopPropagation();e.preventDefault();}},true);
 function ask(){
   return track(res=>{$('#main').onclick=e=>{
     const b=e.target.closest('[data-act]');if(!b||b.disabled)return;
@@ -3296,9 +3306,9 @@ const teamClass=t=>t==='loups'?'wolf':t==='solo'?'solo':'';
 function card(role,tip){
   const r=ROLES[role];
   const label={loups:'Camp des loups',village:'Camp du village',solo:'Solitaire'}[r.team];
-  return `<div class="card ${teamClass(r.team)}"><span class="team">${label}</span><div class="glyph">${icon(r.icon,2.2)}</div><h3 class="card-name">${r.name}</h3><p class="card-desc">${r.desc}</p>${tip&&DISC&&CARD_EX[role]?`<p class="card-ex"><b>Exemple</b> · ${esc(cardExample(role))}</p>`:''}${tip&&r.tip?`<p class="card-tip">${esc(r.tip)}</p>`:''}</div>`;
+  return `<div class="card"><span class="team">${label}</span><div class="glyph">${icon(r.icon,2.2)}</div><h3 class="card-name">${r.name}</h3><p class="card-desc">${r.desc}</p>${tip&&DISC&&CARD_EX[role]?`<p class="card-ex"><b>Exemple</b> · ${esc(cardExample(role))}</p>`:''}${tip&&r.tip?`<p class="card-tip">${esc(r.tip)}</p>`:''}</div>`;
 }
-const usesNumbers=()=>G&&((has('cupidon')&&setup.settings.lovers==='numeros')||has('infect')||has('flute'));
+const usesNumbers=()=>G&&((has('cupidon')&&setup.settings.lovers==='numeros')||has('infect')||(G.extra||[]).includes('infect')||(G.fakeRoles||[]).includes('infect')||has('flute'));
 const sleepPanel=()=>`<div class="sleep"><p>Les yeux fermés.<br>Écoutez la voix.</p></div>`;
 
 // Ce que chaque joueur a appris en secret : affiché par « Mes infos » et sur son téléphone
@@ -3311,7 +3321,7 @@ function privateInfo(p){
   if(p.turnedWolf&&p.role==='chienloup')lines.push('Tu as choisi de devenir loup-garou.');
   if(G.lovers&&G.lovers.includes(p.id))lines.push(`Tu es amoureux de ${P(G.lovers.find(x=>x!==p.id)).name}.`);
   if(G.charmed.includes(p.id))lines.push('Tu es charmé par le joueur de flûte.');
-  if(isWolf(p)){const pack=G.players.filter(x=>x.alive&&isWolf(x)&&x.id!==p.id).map(x=>x.name);if(pack.length)lines.push(`La meute : ${joinFr(pack)}.`);}
+  if(isWolf(p)){const pack=G.players.filter(x=>x.alive&&isWolf(x)&&x.id!==p.id).map(x=>x.name);if(pack.length)lines.push(`La meute : ${joinFr(pack)}.`);const ww=wolfWhere(p);if(ww)lines.push(ww);}
   if(p.role==='juge'&&!G.judgeUsed)lines.push(G.judgeAsk?'Tu as demandé un second vote : il aura lieu après le premier.':'Tu peux demander un second vote, une fois dans la partie.');
   if(G.mayor===p.id)lines.push('Tu es le maire : ta voix compte double et tu tranches les égalités.');
   if(p.role==='comedien'&&G.comedienCards&&G.comedienCards.length)lines.push(`Rôles encore jouables : ${joinFr(G.comedienCards.map(k=>ROLES[k].name))}.`);
@@ -3538,18 +3548,24 @@ function clearHint(players){if(!NET.on)return;for(const p of players)if(NET.R[p.
 // Où se passent les votes, pour un joueur qui joue sur son téléphone
 function whereInfo(p){
   if(!G||G.central.has(p.id)||!p.alive)return [];
-  const out=[];
-  if(isWolf(p)){
-    const pack=alive().filter(isWolf);
-    out.push(pack.every(x=>!G.central.has(x.id))
-      ?'La meute vote sur vos téléphones : votez tous pour la même victime.'
-      :'La meute vote sur le téléphone central, car un loup y joue : quand la voix vous appelle, regardez le téléphone posé au milieu.');
-  }
-  out.push('Les votes du village se font en secret sur ton téléphone.');
-  return out;
+  return ['Les votes du village se font en secret sur ton téléphone.'];
+}
+function wolfWhere(p){
+  if(!G||G.central.has(p.id)||!p.alive||!isWolf(p))return null;
+  return alive().filter(isWolf).every(x=>!G.central.has(x.id))
+    ?'La meute vote sur vos téléphones : votez tous pour la même victime.'
+    :'La meute vote sur le téléphone central, car un loup y joue : quand la voix vous appelle, regardez le téléphone posé au milieu.';
+}
+// Joueur prévu sur son téléphone mais momentanément déconnecté : on lui laisse le temps de revenir
+async function awaitPhone(p,ms=20000){
+  if(!NET.on||!G||G.central.has(p.id)||remoteOK(p))return remoteOK(p);
+  view(waitPanel());
+  const t0=Date.now();
+  while(Date.now()-t0<ms){await wait(500);if(remoteOK(p))return true;}
+  return false;
 }
 async function act(p,task){
-  if(!remoteOK(p))return centralTask(task);
+  if(!remoteOK(p)&&!(await awaitPhone(p)))return centralTask(task);
   const rp=remoteTask(p.id,task);
   view(waitPanel(),fallbackLink);
   const r=await Promise.race([rp,ask().then(()=>FALLBACK)]);
@@ -3566,6 +3582,7 @@ async function act(p,task){
 // Information pour un groupe (amoureux, sœurs, charmés…) : sur leurs téléphones, et au centre si l'un d'eux n'en a pas
 async function informGroup(members,task){
   if(!members.length)return;
+  for(const m of members)if(!remoteOK(m))await awaitPhone(m,12000);
   const rem=members.filter(remoteOK);
   const all=Promise.all(rem.map(m=>remoteTask(m.id,task)));
   if(rem.length<members.length){
@@ -4047,7 +4064,7 @@ function buildDeck(n,c){
   // sans jamais retirer tous les loups de la meute.
   for(let tries=0;tries<80;tries++){
     const deck=shuffle(cards.slice());
-    const idx=deck.map((k,i)=>i).filter(i=>!['soeur','frere','cupidon','flute','montreur','servante'].includes(deck[i]));
+    const idx=deck.map((k,i)=>i).filter(i=>!['soeur','frere','cupidon','flute','montreur','servante','bouc'].includes(deck[i]));
     if(idx.length<2)break;
     shuffle(idx);
     const ex=[deck[idx[0]],deck[idx[1]]];
@@ -4164,32 +4181,37 @@ async function loop(stage){
 // Un rôle mort, absent ou sans pouvoir n'est pas appelé du tout.
 // Un rôle qui agit sur le téléphone se rendort dès qu'il a fini. Seuls les réveils « sans rien à faire »
 // (sœurs, frères, amoureux, charmés, infecté) durent un minimum, le temps de se reconnaître.
-const KEEP_CALLING=['renard','sorciere','comedien'];
+const KEEP_CALLING=['renard','sorciere','comedien','grandmechant','loupblanc'];
 const FAKE_CALL=['juge','voyante','salvateur','renard','corbeau','sorciere','grandmechant','loupblanc','comedien','enfantsauvage','chienloup'];
 async function turn(role,open,close,fn,ok=()=>true){
   const p=holder(role);
-  if(!p){if((G.fakeRoles||[]).includes(role)&&ok({id:-1}))await fakeTurn(open,close);return;}
+  if(!p){if((G.fakeRoles||[]).includes(role)&&ok({id:-1}))await fakeTurn(open,close,role);return;}
   if(!p.alive)return;
   // Un rôle vivant qui a perdu son pouvoir (renard sans flair, sorcière sans potion, comédien sans rôle) est quand même appelé :
   // sinon tout le monde l'apprendrait
-  if(!ok(p)){if(KEEP_CALLING.includes(role)&&!G.noPowers)await fakeTurn(open,close);return;}
+  if(!ok(p)){if(KEEP_CALLING.includes(role)&&(!G.noPowers||ROLES[role].team!=='village'))await fakeTurn(open,close,role);return;}
   await explain('r_'+role);
   await turnFor(p,open,close,fn);
 }
-async function fakeTurn(open,close){
-  view(sleepPanel());
+// Durée d'un appel : un faux appel et un vrai appel rapide durent autant (7 à 15 s)
+function callSpan(){return 7000+Math.random()*8000;}
+const nightPanel=()=>NET.on&&G&&G.players.some(x=>x.alive&&remoteOK(x))?waitPanel():sleepPanel();
+async function fakeTurn(open,close,role){
+  if(role)await explain('r_'+role);
+  view(nightPanel());
   await say(open);
-  await wait(7000+Math.random()*8000);
+  await wait(callSpan());
   await say(close);
   await pw(1600);
 }
 async function turnFor(p,open,close,fn){
   view(sleepPanel());
   await say(open);
-  const t0=Date.now();
+  const t0=Date.now(),span=callSpan();
   await fn(p);
   syncInfo();
   view(sleepPanel());
+  if(Date.now()-t0<span)await wait(span-(Date.now()-t0));
   await pw(1200);
   await say(close);
   await pw(1600);
@@ -4219,12 +4241,12 @@ async function night(){
   await turn('renard','renard_open','renard_close',renard,p=>village()&&!p.flairLost);
   await wolves();
   await turn('grandmechant','gml_open','gml_close',grandMechant,()=>!G.wolfDied&&alive().some(x=>!isWolf(x)&&x.id!==G.victim));
-  await turn('loupblanc','blanc_open','blanc_close',loupBlanc,p=>G.night%2===0&&alive().some(x=>isWolf(x)&&x.id!==p.id));
+  if(G.night%2===0)await turn('loupblanc','blanc_open','blanc_close',loupBlanc,p=>alive().some(x=>isWolf(x)&&x.id!==p.id));
   await turn('sorciere','sorc_open','sorc_close',sorciere,()=>village()&&(G.potions.life||G.potions.death));
   await turn('corbeau','corbeau_open','corbeau_close',corbeau,village);
   await turn('flute','flute_open','flute_close',flute,p=>alive().some(x=>x.id!==p.id&&!G.charmed.includes(x.id)));
   if(G.newCharmed.length)await charmedWake();
-  if(G.newInfected!=null)await infectedNotice();
+  if(G.newInfected!=null||infectCalls())await infectedNotice();
   syncInfo();
 }
 
@@ -4338,7 +4360,7 @@ async function renard(p){
   if(!found&&p.role==='renard')p.flairLost=true;
   addNote(p,`Nuit ${G.night} : ${found?'au moins un loup':'aucun loup'} parmi ${joinFr(grp.map(x=>x.name))}.`);
   chron(`${p.role==='comedien'?'Le comédien':'Le renard'} (${p.name}) flaire ${joinFr(grp.map(x=>x.name))} : ${found?'un loup est là':'aucun loup'}.`);
-  await act(p,{t:'info',eyebrow:'Ton flair',pills:grp.map(x=>x.name),result:{yes:found,text:found?'Au moins un loup-garou se cache parmi eux.':'Aucun loup parmi eux.'},note:found||p.role!=='renard'?'':'Tu as perdu ton flair : tu ne seras plus appelé.'});
+  await act(p,{t:'info',eyebrow:'Ton flair',pills:grp.map(x=>x.name),result:{yes:found,text:found?'Au moins un loup-garou se cache parmi eux.':'Aucun loup parmi eux.'},note:found||p.role!=='renard'?'':"Tu as perdu ton flair. Tu seras quand même appelé chaque nuit, pour ne pas te trahir : garde simplement les yeux fermés."});
 }
 async function wolfVote(pack,prey){
   // Chaque loup vote sur son téléphone ; la victime est retenue quand toute la meute est d'accord
@@ -4447,7 +4469,22 @@ async function charmedWake(){
   await say('charm_close');
   await pw(1600);
 }
+// Tant que l'Infect est vivant (ou mis de côté par le voleur), l'appel « si tu entends ton numéro » a lieu chaque nuit :
+// sinon toute la table saurait qu'une infection vient d'avoir lieu. Les nuits sans infection, on appelle le numéro
+// d'un joueur déjà dans la meute : il sait qu'il est loup, il n'y a donc pas de confusion possible.
+function infectCalls(){const h=holder('infect');return h?h.alive:(G.fakeRoles||[]).includes('infect');}
 async function infectedNotice(){
+  if(G.newInfected==null){
+    const pack=alive().filter(isWolf);if(!pack.length)return;
+    const w=pack[Math.floor(Math.random()*pack.length)];
+    view(sleepPanel());
+    const pr=informGroup([w],{t:'info',eyebrow:`Numéro ${w.num}`,title:'Rien de nouveau pour toi cette nuit.',note:"Tu fais déjà partie de la meute : referme les yeux.",btn:'Compris'});
+    await say('inf_call','n'+w.num);
+    const t0=Date.now();
+    await pr;view(sleepPanel());await holdAwake(t0);
+    await say('inf_close');await pw(1600);
+    return;
+  }
   const p=P(G.newInfected);
   view(sleepPanel());
   syncInfo();
@@ -4644,7 +4681,7 @@ function debate(){
    Renvoie {id} si un joueur a la majorité, {tie:[…]} en cas d'égalité, {} si personne n'a voté. */
 async function secretVote(voters,cands,o){
   const votes={};
-  const task=v=>({t:'pick',eyebrow:o.eyebrow,title:o.voterTitle,note:o.note,ids:cands.filter(i=>o.allowSelf||i!==v.id),confirm:'Voter',alt:"Je m'abstiens",tone:o.tone||'wolf'});
+  const task=v=>({t:'pick',eyebrow:o.eyebrow,title:o.voterTitle,note:o.note,ids:(remoteOK(v)?x=>x:shuffle)(cands.filter(i=>o.allowSelf||i!==v.id)),confirm:'Voter',alt:"Je m'abstiens",tone:o.tone||'wolf'});
   const rem=voters.filter(remoteOK),loc=voters.filter(v=>!remoteOK(v));
   let onBoard=false,closeRes;const closeP=track(r=>{closeRes=r;});
   const board=()=>{
@@ -4666,13 +4703,13 @@ async function secretVote(voters,cands,o){
   if(rem.some(v=>!(v.id in votes))){onBoard=true;board();await Promise.race([Promise.all(rps),closeP]);}
   rem.forEach(v=>cancelTasks(v.id));
   const cnt={},who={},ballots=[];let abst=0;
-  for(const [w,v] of Object.entries(votes)){if(v==null){abst++;continue;}const wt=o.mayorDouble&&G.mayor===+w?2:1;cnt[v]=(cnt[v]||0)+wt;(who[v]=who[v]||[]).push(P(+w).name+(wt>1?' (×2)':''));ballots.push({t:v,w:wt,label:wt>1?'voix double':''});}
+  for(const [w,v] of Object.entries(votes)){if(v==null){abst++;continue;}const wt=o.mayorDouble&&G.mayor===+w?2:1;cnt[v]=(cnt[v]||0)+wt;(who[v]=who[v]||[]).push(P(+w).name+(wt>1?' (×2)':''));for(let k=0;k<wt;k++)ballots.push({t:v,w:1,label:''});}
   if(o.corbeau&&G.corbeauMark!=null&&P(G.corbeauMark).alive&&cands.includes(G.corbeauMark)){cnt[G.corbeauMark]=(cnt[G.corbeauMark]||0)+2;(who[G.corbeauMark]=who[G.corbeauMark]||[]).push('le corbeau (×2)');ballots.push({t:G.corbeauMark,w:2,label:'les deux voix du corbeau'});}
   await tallyReveal(o.eyebrow,shuffle(ballots),cands,abst);
   const max=Math.max(0,...Object.values(cnt));
   const top=Object.keys(cnt).filter(k=>cnt[k]===max).map(Number);
-  const rows=Object.entries(cnt).sort((a,b)=>b[1]-a[1]).map(([t,c])=>`<li><span class="nm">${esc(P(+t).name)}</span><span class="note">${esc(joinFr(who[t]||[]))}</span><span class="pill wolf">${c}</span></li>`).join('');
-  chron(`${o.eyebrow} : ${Object.entries(cnt).sort((a,b)=>b[1]-a[1]).map(([t,c])=>`${P(+t).name} ${c}`).join(', ')||'aucune voix'}.`);
+  const rows=Object.entries(cnt).sort((a,b)=>b[1]-a[1]).map(([t,c])=>`<li><span class="nm">${esc(P(+t).name)}</span><span class="pill wolf">${c} voix</span></li>`).join('');
+  chron(`${o.eyebrow} : ${Object.entries(cnt).sort((a,b)=>b[1]-a[1]).map(([t,c])=>`${P(+t).name} ${c} (${joinFr(who[t]||[])})`).join(', ')||'aucune voix'}.`);
   view(`<p class="eyebrow">${esc(o.eyebrow)} · résultat</p><h2 class="h">${max===0?"Personne n'a voté.":top.length>1?'Égalité.':`${esc(P(top[0]).name)} a le plus de voix.`}</h2><ul class="roster">${rows||'<li><span class="nm note">Aucune voix.</span></li>'}</ul>`,
     `<button class="btn" type="button" data-act="ok">Continuer</button>`);
   await ask();
@@ -4758,9 +4795,16 @@ async function applyVerdict(res){
   if(sv&&!G.servanteUsed&&!G.noPowers){
     let r;
     if(remoteOK(sv)){
-      const pr=act(sv,{t:'choice',eyebrow:'Servante dévouée',title:`Prendre la place de ${p.name} ?`,note:'Tu te dévoiles devant tout le monde et récupères son rôle. Sa carte ne sera pas révélée.',opts:[['oui','Me dévoiler et prendre son rôle','wolf'],['non','Ne rien faire','ghost']]});
+      // La même question s'affiche sur tous les téléphones : seule la réponse de la servante compte.
+      // Sinon, celle qui baisse les yeux vers son téléphone à ce moment-là serait démasquée.
+      const voters=alive().filter(x=>x.id!==p.id&&remoteOK(x));
+      const task={t:'choice',eyebrow:'Servante dévouée',title:`Prendre la place de ${p.name} ?`,note:"Cette question s'affiche sur tous les téléphones. Si tu es la servante dévouée, tu peux te dévoiler et récupérer son rôle (sa carte ne sera pas révélée). Sinon, touche « Ne rien faire ».",opts:[['oui','Me dévoiler et prendre son rôle',''],['non','Ne rien faire','']]};
+      const prs=voters.map(x=>remoteTask(x.id,task).then(v=>{if(x.id===sv.id)r=v;}));
+      view(`<p class="eyebrow">Servante dévouée</p><h2 class="h">Tout le monde répond sur son téléphone.</h2><p class="note">La servante dévouée peut prendre la place de ${esc(p.name)}.</p>`);
       await say('servante_ask');
-      r=await pr;
+      await Promise.race([Promise.all(prs),wait(20000)]);
+      voters.forEach(x=>cancelTasks(x.id));
+      if(r!=='oui')r='non';
     } else {
       const pr=centralTask({t:'choice',eyebrow:'Servante dévouée',title:`La servante dévouée veut-elle prendre la place de ${p.name} ?`,note:"Si elle le souhaite, elle se dévoile et touche son nom. Sinon, n'importe qui touche « Personne ».",opts:[['oui','La servante se dévoile','wolf'],['non','Personne','ghost']]});
       await say('servante_ask');
@@ -4899,6 +4943,9 @@ function openSheet(mode='menu',arg){
     p.innerHTML=`<p class="eyebrow">${esc(q.name)}, ton rôle</p>${card(q.role,true)}${usesNumbers()?secretBox(q.num):''}
       ${info.length?`<p class="eyebrow">Ce que tu sais</p>${info.map(x=>`<p class="note">${esc(x)}</p>`).join('')}`:''}
       <button class="btn" type="button" data-s="close">Cacher</button>`;
+    // Une carte oubliée à l'écran se referme seule
+    const tok=String(Math.random()).slice(2);p.insertAdjacentHTML('beforeend',`<i hidden data-ac="${tok}"></i>`);
+    setTimeout(()=>{if(p.querySelector(`[data-ac="${tok}"]`)&&!$('#sheet').hidden)$('#sheet').hidden=true;},20000);
   } else if(mode==='stop'){
     p.innerHTML=`<h2 class="h">Arrêter la partie en cours ?</h2><p class="note">Les rôles seront perdus. Les joueurs et la composition restent enregistrés.</p>
       <button class="btn wolf" type="button" data-s="stopok">Oui, arrêter</button><button class="btn ghost" type="button" data-s="close">Continuer la partie</button>`;
@@ -4939,7 +4986,7 @@ function presetComp(name,n){
   const fill=(list)=>{let room=n-wolves-1;for(const k of list){const c=cardsOf(k);if(room>=c){r[k]=c;room-=c;}}};
   if(name==='decouverte'){r.loup=wolves;fill(['voyante','sorciere','chasseur'].slice(0,n>=7?3:n>=6?2:1));}
   else if(name==='enquete'){r.loup=Math.max(1,wolves-(n>=12?1:0));r.grandmechant=n>=12?1:0;fill(['voyante','renard','montreur','corbeau','salvateur',...(jugeAllowed()?['juge']:[]),'sorciere']);}
-  else if(name==='chaos'){r.loup=Math.max(1,wolves-1);r.infect=n>=8?1:0;if(!r.infect)r.loup=wolves;fill(['voyante','sorciere','cupidon',n>=10?'loupblanc':'',n>=9?'flute':'','chienloup','idiot','servante',n>=12?'comedien':'','ange'].filter(Boolean));}
+  else if(name==='chaos'){r.loup=Math.max(1,wolves-1);r.infect=n>=8?1:0;if(!r.infect)r.loup=wolves;fill(['voyante','sorciere','cupidon',n>=10?'loupblanc':'',n>=9?'flute':'','chienloup','idiot',jugeAllowed()?'servante':'',n>=12?'comedien':'','ange'].filter(Boolean));}
   else return recommended(n);
   return r;
 }
@@ -4950,8 +4997,10 @@ function comp(){
 const cardsOf=k=>ROLES[k].cards||1;
 const totalCards=c=>setup.count+(c.voleur?2:0);
 function villagers(){const c=comp();return totalCards(c)-['loup',...SPECIALS].reduce((s,k)=>s+(c[k]||0),0);}
-/* Juge bègue : il demande le second vote en pleine journée. Sur le téléphone central, il se dévoilerait
-   en tendant la main vers l'écran : le rôle n'est donc possible que si chaque joueur joue sur son propre téléphone. */
+/* Juge bègue et servante dévouée : ils décident en pleine journée, les yeux de tous ouverts. Sur le téléphone central,
+   ils se dévoileraient en tendant la main vers l'écran : ces rôles ne sont donc possibles que si chaque joueur joue
+   sur son propre téléphone. */
+const PHONE_ONLY=['juge','servante'];
 const seatConnected=i=>!!(NET.owners[i]&&NET.seatKeys[i]&&NET.gr&&NET.gr.peers().some(x=>x.peer===NET.owners[i]));
 const jugeAllowed=()=>!!setup.settings.phones&&effectiveNames().every((_,i)=>seatMode(i)==='phone');
 const jugeWaiting=()=>effectiveNames().filter((_,i)=>!seatConnected(i));
@@ -4963,8 +5012,9 @@ function problem(){
   if(pack<1)return 'Il faut au moins un loup-garou dans la meute (loup, grand méchant loup ou infect).';
   if(allWolves*2>=n)return 'Trop de loups : ils doivent être moins de la moitié des joueurs.';
   const v=villagers();if(v<0)return `Trop de cartes pour ${n} joueurs : retire ${-v} carte${-v>1?'s':''}.`;
-  if(c.juge&&!jugeAllowed())return "Le juge bègue n'est possible que si tous les joueurs jouent sur leur propre téléphone : sur le téléphone central, il se dévoilerait en touchant l'écran. Retire-le, ou passe tout le monde sur « Son tél. ».";
-  if(c.juge){const w=jugeWaiting();if(w.length)return `Avec le juge bègue, tout le monde doit être connecté sur son téléphone. En attente de : ${w.map(esc).join(', ')}.`;}
+  const po=PHONE_ONLY.filter(k=>c[k]).map(k=>ROLES[k].name.toLowerCase().replace('juge','le juge').replace('servante','la servante'));
+  if(po.length&&!jugeAllowed()){const many=po.length>1,m=`${joinFr(po)} ${many?'ne sont possibles':"n'est possible"} que si tous les joueurs jouent sur leur propre téléphone : ${many?'ces rôles décident':'ce rôle décide'} en plein jour, et ${many?'se dévoileraient':'se dévoilerait'} en touchant le téléphone central. ${many?'Retire-les':'Retire-le'}, ou passe tout le monde sur « Son tél. ».`;return m[0].toUpperCase()+m.slice(1);}
+  if(po.length){const w=jugeWaiting();if(w.length)return `Avec ${joinFr(po)}, tout le monde doit être connecté sur son téléphone. En attente de : ${w.map(esc).join(', ')}.`;}
   return '';
 }
 // Jauge d'équilibre : une estimation simple de la force de chaque camp
@@ -5029,8 +5079,8 @@ function renderSetup(){
     const r=ROLES[k];
     const ctl=k==='loup'
       ?`<div class="stepper"><button type="button" data-act="dec" aria-label="Un loup de moins">−</button><output aria-live="polite">${c.loup||0}</output><button type="button" data-act="inc" aria-label="Un loup de plus">+</button></div>`
-      :`${r.cards?`<span class="cards-n">${r.cards} cartes</span>`:r.cardsExtra?`<span class="cards-n">+2 cartes</span>`:''}<button class="switch" type="button" role="switch" aria-checked="${c[k]?'true':'false'}" aria-label="${r.label||r.name}" data-act="tog" data-k="${k}" ${k==='juge'&&!jugeAllowed()&&!c[k]?'disabled':''}></button>`;
-    const lock=k==='juge'&&!jugeAllowed();
+      :`${r.cards?`<span class="cards-n">${r.cards} cartes</span>`:r.cardsExtra?`<span class="cards-n">+2 cartes</span>`:''}<button class="switch" type="button" role="switch" aria-checked="${c[k]?'true':'false'}" aria-label="${r.label||r.name}" data-act="tog" data-k="${k}" ${PHONE_ONLY.includes(k)&&!jugeAllowed()&&!c[k]?'disabled':''}></button>`;
+    const lock=PHONE_ONLY.includes(k)&&!jugeAllowed();
     return `<div class="rrow ${teamClass(r.team)}${lock&&!c[k]?' locked':''}"><span class="ic">${icon(r.icon,3)}</span><div class="rn"><b>${k==='loup'?(THEME_REN.loup?esc(r.name):'Loups-garous'):esc(r.label||r.name)}</b><span>${r.brief}${lock?' <em class="lockn">Seulement si chacun joue sur son propre téléphone.</em>':''}</span></div>${ctl}</div>`;
   };
   const rows=GROUPS.map(([title,keys])=>`<p class="rgroup">${title}</p>${keys.map(row).join('')}`).join('')
@@ -5207,6 +5257,12 @@ function renderClient(){
   if(applyTheme(pub&&!isUC?pub.theme:null,pub&&!isUC?pub.renames:null))CL.shown=null;
   const disc=!!(pub&&!isUC&&pub.disc);if(disc!==DISC){DISC=disc;CL.shown=null;}
   document.documentElement.dataset.phase=!isUC&&(phase==='day'||phase==='end')?'day':'night';
+  // La carte affichée se recache d'elle-même : à chaque changement de phase, de partie ou de manche
+  const ck=pub?`${pub.gid}|${phase}|${pub.round||''}`:'';
+  if(CL.cardKey!==ck){CL.cardKey=ck;CL.showCard=false;clearTimeout(CL.cardT);}
+  if(CL.judgeGid!==(pub&&pub.gid)){CL.judgeGid=pub&&pub.gid;CL.judgeSent=false;}
+  // La nuit, sur les téléphones des joueurs, pas de bouton rouge propre aux loups : la lueur se verrait dans le noir
+  document.documentElement.classList.toggle('clnight',!isUC&&phase==='night');
   const b=$('#bar');b.hidden=false;
   const label=isXg?(pub.game==='sp'?"L'Espion":'Les Missions'):isUC?(pub.round?`Tour ${+pub.round}`:'Undercover'):!pub||phase==='lobby'||phase==='deal'?'Ton téléphone':phase==='end'?'Fin de partie':`${phase==='night'?'Nuit':'Jour'} ${+pub.night||1}`;
   const conn=CL.gr?CL.gr.connected():false;
@@ -5258,7 +5314,7 @@ function renderClient(){
   if(st&&st.task&&!CL.sent[st.task.id]){
     const key='task:'+JSON.stringify(st.task);
     if(CL.shown!==key){
-      CL.shown=key;
+      CL.shown=key;CL.showCard=false;clearTimeout(CL.cardT);
       renderTask(st.task,names,v=>sendAct(st.task.id,v));
     }
     return;
@@ -5284,8 +5340,6 @@ function renderClient(){
     body+=`<p class="note">${phase==='night'?'Garde ton téléphone en main, écran vers toi. Quand la voix appelle ton rôle, ouvre les yeux et regarde-le : il ne vibre jamais, pour ne trahir personne.':phase==='end'?'La partie est terminée.':'Débattez ! Le vote se fera ici, sur ton téléphone.'}</p>`;
     const where=Array.isArray(st.where)?st.where:[];
     if(where.length&&phase!=='end')body+=`<div class="where"><span class="eyebrow">Où se passent les votes</span>${where.map(x=>`<p>${esc(x)}</p>`).join('')}</div>`;
-    if(st.alive&&phase==='day'&&st.judge&&!CL.judgeSent)body+=`<button class="btn ghost" type="button" data-act="judge">Juge bègue : demander un second vote</button><p class="note">Personne ne saura que la demande vient de toi.</p>`;
-    if(CL.judgeSent&&phase==='day')body+=`<p class="note">Second vote demandé. Il aura lieu après le premier.</p>`;
     if(st.alive&&phase==='day'&&Array.isArray(pub.alive)){
       const opts=names.map((n,i)=>({n,i})).filter(x=>x.i!==CL.seat&&pub.alive[x.i]);
       body+=`<p class="eyebrow">Je soupçonne…</p><div class="chips2">${opts.map(x=>`<button class="tog" type="button" data-sus="${x.i}" aria-pressed="${CL.sus===x.i}">${esc(x.n)}</button>`).join('')}</div><p class="note">Ton soupçon s'affiche sur le téléphone central, avec ton nom.</p>`;
@@ -5295,6 +5349,9 @@ function renderClient(){
       if(st.num!=null)body+=secretBox(st.num);
       const info=Array.isArray(st.info)?st.info:[];
       if(info.length)body+=`<p class="eyebrow">Ce que tu sais</p>${info.map(x=>`<p class="note">${esc(x)}</p>`).join('')}`;
+      // Le bouton du juge n'apparaît qu'avec la carte : un voisin qui jette un œil ne le voit pas
+      if(st.alive&&phase==='day'&&st.judge&&!CL.judgeSent)body+=`<button class="btn ghost" type="button" data-act="judge">Juge bègue : demander un second vote</button><p class="note">Personne ne saura que la demande vient de toi.</p>`;
+      if(CL.judgeSent&&phase==='day')body+=`<p class="note">Second vote demandé. Il aura lieu après le premier.</p>`;
     }
   }
   if(pub.final&&Array.isArray(pub.final)){
@@ -5304,11 +5361,17 @@ function renderClient(){
   }
   const actions=st?`<button class="btn ${CL.showCard?'ghost':''}" type="button" data-act="card">${CL.showCard?'Cacher mes infos':'Voir mon rôle et mes infos'}</button>`:'';
   clientShow('idle:'+body+actions,body,actions,()=>{$('#main').onclick=e=>{
-    if(e.target.closest('[data-act=card]')){CL.showCard=!CL.showCard;renderClient();}
+    if(e.target.closest('[data-act=card]')){toggleCard();}
     if(e.target.closest('[data-act=judge]')){CL.judgeSent=true;sendSpecial('judge');renderClient();}
     const sb=e.target.closest('[data-sus]');
     if(sb){const i=+sb.dataset.sus;CL.sus=CL.sus===i?null:i;CL.gr.presence({sus:CL.sus}).catch(()=>{});renderClient();}
   };});
+}
+// Afficher / cacher sa carte ; elle se recache seule au bout de 15 s
+function toggleCard(){
+  CL.showCard=!CL.showCard;clearTimeout(CL.cardT);
+  if(CL.showCard)CL.cardT=setTimeout(()=>{CL.showCard=false;renderClient();},15000);
+  renderClient();
 }
 // Message secret sans tâche en attente (demande du juge bègue)
 async function sendSpecial(id){try{const a=await seal(CL.key,{id,v:1});await CL.gr.presence({a});}catch(e){}}
@@ -5594,8 +5657,8 @@ async function ucResumeScreen(){
 
 function ucWordTask(p){
   return p.role==='white'
-    ?{t:'info',eyebrow:`${p.name}, ton rôle`,big:'Mr White',note:["Tu n'as pas de mot. Écoute les autres, fonds-toi dans la masse et devine le mot des civils.","Si tu es éliminé, tu pourras encore gagner en le devinant."],btn:"C'est noté"}
-    :{t:'info',eyebrow:`${p.name}, ton mot`,big:p.word,note:["Retiens-le et ne le montre à personne.","Tu ne sais pas si tu es civil ou undercover : écoute bien les autres."],btn:"C'est noté"};
+    ?{t:'info',eyebrow:`${p.name}, ta carte`,big:'Mr White',note:["Tu n'as pas de mot : écoute les autres et devine le leur.","Éliminé, tu pourras encore gagner en le devinant."],btn:"C'est noté"}
+    :{t:'info',eyebrow:`${p.name}, ta carte`,big:p.word,note:["Retiens ton mot et ne le montre à personne.","Civil ou undercover ? Écoute bien les autres."],btn:"C'est noté"};
 }
 async function ucDeal(){
   const rem=UC.players.filter(ucRemoteOK),seen=new Set();
@@ -5781,8 +5844,8 @@ function ucClientIdle(pub,st,myName,names){
   } else {
     const sent=st.task&&CL.sent[st.task.id];
     body+=`<h2 class="h">${sent?'Vote envoyé.':!st.alive?'Tu es éliminé.':pub.phase==='vote'?'Vote en cours…':pub.phase==='end'?'Partie terminée.':'Tu es en jeu.'}</h2>`;
-    if(CL.showCard)body+=st.white?`<div class="wordbox"><span class="eyebrow">Ton rôle</span><b>Mr White</b><span class="note">Tu n'as pas de mot : devine celui des civils.</span></div>`
-      :`<div class="wordbox"><span class="eyebrow">Ton mot</span><b>${esc(st.word)}</b></div>`;
+    if(CL.showCard)body+=st.white?`<div class="wordbox"><span class="eyebrow">Ta carte</span><b>Mr White</b></div>`
+      :`<div class="wordbox"><span class="eyebrow">Ta carte</span><b>${esc(st.word)}</b></div>`;
   }
   if(pub.phase==='talk'&&Array.isArray(pub.order)&&pub.order.length){const cur=pub.order.indexOf(pub.speaker);body+=`<p class="eyebrow">Ordre de parole</p><ol class="order">${pub.order.map((i,j)=>`<li class="${cur>=0&&j<cur?'done':j===cur?'cur':''}">${esc(names[i]==null?'?':names[i])}${j===cur&&i===CL.seat?' · à toi !':''}</li>`).join('')}</ol>`;}
   if(pub.final&&typeof pub.final==='object'){
@@ -5794,7 +5857,7 @@ function ucClientIdle(pub,st,myName,names){
     if(log.length)body+=`<p class="eyebrow">Dans la partie</p>${log.slice().reverse().map(x=>`<p class="note">${esc(x)}</p>`).join('')}`;
   }
   const actions=st&&!pub.final?`<button class="btn ${CL.showCard?'ghost':''}" type="button" data-act="card">${CL.showCard?'Cacher mon mot':'Voir mon mot'}</button>`:'';
-  clientShow('ucidle:'+body+actions,body,actions,()=>{$('#main').onclick=e=>{if(e.target.closest('[data-act=card]')){CL.showCard=!CL.showCard;renderClient();}};});
+  clientShow('ucidle:'+body+actions,body,actions,()=>{$('#main').onclick=e=>{if(e.target.closest('[data-act=card]')){toggleCard();}};});
 }
 
 
@@ -5981,20 +6044,26 @@ function xCardSheet(id,reveal){
       <button class="btn" type="button" data-xshow="${id}">Oui, afficher ma carte</button><button class="btn ghost" type="button" data-x="close">Annuler</button>`;
   } else {
     p.innerHTML=`<p class="eyebrow">${esc(XP(id).name)}</p>${xCardHTML(xCardData(XP(id)))}<button class="btn" type="button" data-x="close">Cacher</button>`;
+    const tok=String(Math.random()).slice(2);p.insertAdjacentHTML('beforeend',`<i hidden data-ac="${tok}"></i>`);
+    setTimeout(()=>{if(p.querySelector(`[data-ac="${tok}"]`)&&!s.hidden)s.hidden=true;},20000);
   }
 }
 function xCardHTML(c){
   if(!c)return '';
   if(c.game==='sp'){
-    if(c.spy)return `<div class="card wolf"><span class="team">Tu es l'espion</span><div class="glyph">${icon('mask',2.2)}</div><h3 class="card-name">Espion</h3><p class="card-desc">Tu ne connais pas le lieu. Écoute, fonds-toi dans la masse et devine-le. Voici les lieux possibles :</p></div>
-      <div class="loclist">${c.list.map(l=>`<button type="button" class="locitem ${CL.cross&&CL.cross.has(l)?'off':''}" data-cross="${esc(l)}">${esc(l)}</button>`).join('')}</div><p class="note" style="text-align:center">Touche un lieu pour le rayer.</p>`;
-    return `<div class="card"><span class="team">Lieu secret</span><div class="glyph">${icon('house',2.2)}</div><h3 class="card-name">${esc(c.loc)}</h3><p class="card-desc">Ton rôle sur place : <b>${esc(c.role)}</b>. Réponds aux questions sans trop en dire : l'espion écoute.</p></div>`;
+    if(c.spy)return `<div class="card"><span class="team">Ta carte</span><div class="glyph">${icon('mask',2.2)}</div><h3 class="card-name">Espion</h3><p class="card-desc">Tu ne connais pas le lieu : écoute les autres et devine-le.</p></div>`;
+    return `<div class="card"><span class="team">Ta carte</span><div class="glyph">${icon('mask',2.2)}</div><h3 class="card-name">${esc(c.loc)}</h3><p class="card-desc">Ton rôle sur place : <b>${esc(c.role)}</b>.</p></div>`;
   }
   const r=MI_ROLES[c.role]||MI_ROLES.resistant;
-  return `<div class="card ${r.team==='traitre'?'wolf':''}"><span class="team">${r.team==='traitre'?'Les traîtres':'La résistance'}</span><div class="glyph">${icon(r.icon,2.2)}</div><h3 class="card-name">${r.name}</h3><p class="card-desc">${r.desc}</p></div>
+  return `<div class="card"><span class="team">${r.team==='traitre'?'Les traîtres':'La résistance'}</span><div class="glyph">${icon(r.icon,2.2)}</div><h3 class="card-name">${r.name}</h3><p class="card-desc">${r.desc}</p></div>
     ${(c.know||[]).map(x=>`<p class="note" style="text-align:center"><b>${esc(x)}</b></p>`).join('')}`;
 }
-// Rayer des lieux (l'espion, sur son téléphone ou dans « Ma carte »)
+// La liste des lieux possibles est affichée pour tout le monde (comme le plateau du jeu de société) :
+// l'espion n'a ainsi aucune raison de consulter sa carte plus que les autres. Sur son téléphone, chacun peut rayer des lieux.
+const spLocsHTML=cross=>`<details class="locs"><summary>Les ${SP_NAMES.length} lieux possibles</summary><div class="loclist">${SP_NAMES.map(l=>cross
+  ?`<button type="button" class="locitem ${CL.cross&&CL.cross.has(l)?'off':''}" data-cross="${esc(l)}">${esc(l)}</button>`
+  :`<span class="locitem">${esc(l)}</span>`).join('')}</div>${cross?'<p class="note" style="text-align:center">Touche un lieu pour le rayer.</p>':''}</details>`;
+// Rayer des lieux (sur son téléphone)
 document.addEventListener('click',e=>{
   const c=e.target.closest('[data-cross]');if(!c)return;
   CL.cross=CL.cross||new Set();const l=c.dataset.cross;
@@ -6178,7 +6247,7 @@ function spTalk(){
     view(`<p class="eyebrow">Manche ${XG.round} · questions</p><div class="clock" id="spclock">${fmt(XG.left)}</div>
       ${XG.left===(XS.sp.opt.minutes||8)*60?`<p class="lead" style="text-align:center">C'est <b>${esc(XP(XG.first).name)}</b> qui pose la première question.</p>`:''}
       <p class="note">Chacun pose une question à un autre joueur, qui répond puis interroge quelqu'un d'autre (jamais celui qui vient de l'interroger). Restez vagues : l'espion écoute.</p>
-      <p class="note">Un trou de mémoire ? « Ma carte », en haut, pour revoir la sienne.</p>`,
+      <p class="note">Un trou de mémoire ? « Ma carte », en haut, pour revoir la sienne.</p>${spLocsHTML(false)}`,
       `<div class="row"><button class="btn wolf" type="button" data-act="acc" ${can.length?'':'disabled'}>J'accuse quelqu'un</button><button class="btn ghost" type="button" data-act="spy">L'espion se dévoile</button></div>
        <div class="row"><button class="btn ghost small" type="button" data-act="plus">+1 minute</button><button class="btn ghost small" type="button" data-act="stop">Arrêter le chrono</button></div>`);
     $('#main').onclick=e=>{
@@ -6344,6 +6413,7 @@ function miCardData(p){
   if(r==='oberon')know.push('Tu ne connais pas tes complices.');
   if(r==='merlin'){const c=others.filter(q=>miIsTraitor(q)&&q.role!=='mordred');know.push(`Les traîtres : ${names(c)}.`);if(XG.players.some(q=>q.role==='mordred'))know.push('Mordred est caché parmi les autres.');}
   if(r==='perceval'){const c=shuffle(others.filter(q=>q.role==='merlin'||q.role==='morgane'));know.push(c.length>1?`Merlin est l'un de ces deux joueurs : ${names(c)}.`:`Merlin : ${names(c)}.`);}
+  if(!know.length)know.push("Tu ne connais l'identité de personne.");
   return {game:'mi',role:r,know};
 }
 function miStart(){
@@ -6412,9 +6482,7 @@ async function miLoop(){
     // 3. La mission, en secret
     XG.phase='mission';setXBar();xPub();
     const members=XG.team.map(XP);
-    const cards=await xCollect(members,p=>miIsTraitor(p)
-      ?{t:'choice',eyebrow:`Mission ${mi+1}`,title:'Ta carte de mission',note:'Tu es un traître : tu peux saboter, ou jouer la réussite pour ne pas te dévoiler.',opts:[['ok','Réussite',''],['ko','Sabotage','wolf']]}
-      :{t:'choice',eyebrow:`Mission ${mi+1}`,title:'Ta carte de mission',note:'Tu es résistant : tu joues forcément la réussite.',opts:[['ok','Réussite','']]},`Mission ${mi+1}`);
+    const cards=await xCollect(members,p=>({t:'choice',eyebrow:`Mission ${mi+1}`,title:'Ta carte de mission',note:"Les traîtres peuvent saboter. Pour un résistant, les deux boutons comptent comme une réussite.",opts:shuffle([['ok','Réussite',''],['ko','Sabotage','']])}),`Mission ${mi+1}`);
     const played=shuffle(members.map(p=>cards[p.id]==='ko'&&miIsTraitor(p)?'ko':'ok'));
     const sab=played.filter(c=>c==='ko').length,ok=sab<M.fails;
     await miReveal(mi,played,ok);
@@ -6506,7 +6574,9 @@ function xClientIdle(pub,st,myName,names){
     body+=`<h2 class="h">${sent?'Choix envoyé.':ph}</h2>`;
     if(k==='sp'&&typeof pub.left==='number'&&pub.phase==='talk')body+=`<div class="clock small">${Math.floor(pub.left/60)}:${String(Math.max(0,pub.left)%60).padStart(2,'0')}</div>`;
     if(CL.showCard)body+=xCardHTML(st.card);
-    if(k==='sp'&&st.card&&st.card.spy&&!pub.final&&!['guess','reveal'].includes(pub.phase))body+=`<button class="btn wolf" type="button" data-act="spyout">Je me dévoile et je devine le lieu</button>`;
+    if(k==='sp'&&st.card&&!pub.final&&pub.phase==='talk')body+=spLocsHTML(true);
+    // Le même bouton pour tous : seul celui de l'espion déclenche quelque chose
+    if(k==='sp'&&st.card&&!pub.final&&!['guess','reveal'].includes(pub.phase))body+=`<button class="btn ghost" type="button" data-act="spyout">L'espion se dévoile (si c'est toi)</button>`;
   }
   if(k==='mi'&&pub.board){
     const b=pub.board;
@@ -6522,9 +6592,9 @@ function xClientIdle(pub,st,myName,names){
   }
   const actions=st&&!pub.final?`<button class="btn ${CL.showCard?'ghost':''}" type="button" data-act="card">${CL.showCard?'Cacher ma carte':'Voir ma carte'}</button>`:'';
   clientShow('xidle:'+body+actions,body,actions,()=>{$('#main').onclick=e=>{
-    if(e.target.closest('[data-act=card]')){CL.showCard=!CL.showCard;renderClient();}
+    if(e.target.closest('[data-act=card]')){toggleCard();}
     const so=e.target.closest('[data-act=spyout]');
-    if(so){if(so.dataset.sure){sendSpecial('spy');so.disabled=true;so.textContent='Demande envoyée';}else{so.dataset.sure='1';so.textContent='Confirmer : je suis l\'espion';}}
+    if(so){if(so.dataset.sure){if(CL.st&&CL.st.card&&CL.st.card.spy){sendSpecial('spy');so.textContent='Demande envoyée';}else so.textContent="Tu n'es pas l'espion.";so.disabled=true;}else{so.dataset.sure='1';so.textContent='Confirmer : je suis l\'espion';}}
   };});
 }
 
