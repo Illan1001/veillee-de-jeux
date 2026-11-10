@@ -451,7 +451,7 @@ html.big .btn{font-size:20px;min-height:62px}
 .msc.op,.msc.mine,.msc.wrong{background:var(--open);border-right:1px solid var(--grid);border-bottom:1px solid var(--grid)}
 .msc.op{cursor:default}
 .msc.boom{background:#ff0000}
-.msc.wrong i{position:absolute;inset:16%;background:linear-gradient(45deg,transparent 44%,#e00 44% 56%,transparent 56%),linear-gradient(-45deg,transparent 44%,#e00 44% 56%,transparent 56%)}
+.msc.wrong svg{opacity:.45}.msc.wrong i{position:absolute;inset:16%;background:linear-gradient(45deg,transparent 44%,#e00 44% 56%,transparent 56%),linear-gradient(-45deg,transparent 44%,#e00 44% 56%,transparent 56%)}
 .msc[data-n="1"]{color:var(--n1)}.msc[data-n="2"]{color:var(--n2)}.msc[data-n="3"]{color:var(--n3)}.msc[data-n="4"]{color:var(--n4)}
 .msc[data-n="5"]{color:var(--n5)}.msc[data-n="6"]{color:var(--n6)}.msc[data-n="7"]{color:var(--n7)}.msc[data-n="8"]{color:var(--n8)}
 /* politique : cases LFI à révéler, cases RN à éviter */
@@ -6890,7 +6890,7 @@ const msSec=ms=>{const s=ms/1000;return s<60?`${s.toFixed(1).replace('.',',')} s
 function msCellHTML(i){
   const t=MS.theme,o=MS.open[i],f=MS.flag[i],x=i%MS.c+1,y=((i/MS.c)|0)+1;
   if(MS.over&&MS.mine&&MS.mine[i]&&!f)return `<button class="msc mine${i===MS.boom?' boom':''}" type="button" data-i="${i}" aria-label="${MS_THEMES[t].mines}, colonne ${x} ligne ${y}">${msMineSVG(t)}</button>`;
-  if(MS.over&&!MS.won&&f&&MS.mine&&!MS.mine[i])return `<button class="msc wrong" type="button" data-i="${i}" aria-label="Erreur, colonne ${x} ligne ${y}">${msMineSVG(t)}<i></i></button>`;
+  if(MS.over&&!MS.won&&f&&MS.mine&&!MS.mine[i])return `<button class="msc wrong" type="button" data-i="${i}" aria-label="${MS_THEMES[t].flag} mal placé, colonne ${x} ligne ${y}">${msFlagSVG(t)}<i></i></button>`;
   if(f)return `<button class="msc cov" type="button" data-i="${i}" aria-label="${MS_THEMES[t].flag}, colonne ${x} ligne ${y}">${msFlagSVG(t)}</button>`;
   if(!o)return `<button class="msc cov" type="button" data-i="${i}" aria-label="Case cachée, colonne ${x} ligne ${y}"></button>`;
   const a=MS.adj[i];
