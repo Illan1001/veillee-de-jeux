@@ -5881,8 +5881,10 @@ function ucTalk(){
 // Ordre de parole : la table, à partir d'un joueur tiré au sort (jamais Mr White en premier si possible)
 function ucOrder(){
   const a=ucAlive();
-  let start=Math.floor(Math.random()*a.length);
-  for(let k=0;k<a.length&&a[start].role==='white';k++)start=(start+1)%a.length;
+  // Le premier à parler est tiré au hasard parmi ceux qui ne sont pas Mr White
+  // (sans décaler vers le voisin, ce qui ferait parler Mr White en dernier deux fois plus souvent).
+  const ok=a.map((p,i)=>i).filter(i=>a[i].role!=='white');
+  const start=ok.length?ok[Math.floor(Math.random()*ok.length)]:0;
   return a.slice(start).concat(a.slice(0,start)).map(p=>p.id);
 }
 async function ucLoop(){
