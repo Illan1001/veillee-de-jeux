@@ -5751,13 +5751,28 @@ document.addEventListener('click',e=>{
 });
 function ucStop(){abortGame();UC=null;clearUCSave();ucNetInit();ucRenderSetup();window.scrollTo(0,0);}
 
+// Tirage équitable : on évite de redonner Mr White à quelqu'un qui l'a été récemment,
+// et l'undercover à quelqu'un qui l'était à la partie précédente (mémoire par prénom).
+function ucFairRoles(names,c){
+  const hist=store.get('uc-roles-hist',[]),n=names.length,key=x=>String(x).trim().toLowerCase();
+  const roles=Array(n).fill('civil'),free=shuffle(names.map((_,i)=>i));
+  const recent=(r,k)=>new Set(hist.slice(-k).flatMap(h=>h[r]||[]));
+  const pick=(r,count,k)=>{
+    const bad=recent(r,k);
+    const ok=free.filter(i=>!bad.has(key(names[i]))),rest=free.filter(i=>bad.has(key(names[i])));
+    for(const i of ok.concat(rest).slice(0,count)){roles[i]=r;free.splice(free.indexOf(i),1);}
+  };
+  pick('white',c.white,Math.max(1,Math.floor(n/2)));
+  pick('under',c.under,1);
+  hist.push({white:names.filter((_,i)=>roles[i]==='white').map(key),under:names.filter((_,i)=>roles[i]==='under').map(key)});
+  store.set('uc-roles-hist',hist.slice(-20));
+  return roles;
+}
 async function ucStart(){
   abortGame();
   if(ucProblem())return;
   const names=ucNames(),n=names.length,c=ucComp();
-  const roles=[...Array(c.under).fill('under'),...Array(c.white).fill('white')];
-  while(roles.length<n)roles.push('civil');
-  shuffle(roles);
+  const roles=ucFairRoles(names,c);
   const pool=ucPool();
   let fresh=pool.filter(w=>!ucUsed.has(pairKey(w)));
   if(!fresh.length){pool.forEach(w=>ucUsed.delete(pairKey(w)));fresh=pool;}
